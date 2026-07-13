@@ -33,7 +33,7 @@ Use the canonical status ID as identity. Reuse the directory when the same URL i
 
 ## Orchestration rule
 
-Treat this entire document as one workflow, not a menu of independent skills. The root `$x-to-china-social` skill owns sequencing and calls extractors, `$dbs-content`, `$humanizer-zh`, `$baoyu-article-illustrator`, `$imagegen`, `$baoyu-xhs-images`, and `$gzh-design` internally when their stage applies.
+Treat this entire document as one workflow, not a menu of independent skills. The root `$x-to-china-social` skill owns sequencing and calls extractors, `$dbs-content`, `$humanizer-zh`, `$baoyu-article-illustrator`, `$imagegen`, `$baoyu-xhs-images`, and `$dbs-wechat-html` internally when their stage applies.
 
 Create `workflow-state.json` with `scripts/init_workflow.py`. Set exactly one stage to `in_progress`; mark it `completed` only after its gate passes, then advance `current_stage`. Use `blocked` only for an inaccessible source or a required user confirmation. Record the blocking reason in `note` and resume from that stage without repeating earlier work.
 
@@ -90,15 +90,13 @@ Gate: Check attribution, factual fidelity, disclosure of translation/summary, se
 
 For Xiaohongshu cards, pass the accepted `xiaohongshu.md` and eligible mapped assets to `$baoyu-xhs-images`; store final assets in `media/platform/xhs/` or record its actual output location.
 
-For WeChat, map eligible local images into `wechat.md`, store platform variants in `media/platform/wechat/`, then pass the Markdown to `$gzh-design`. A WeChat job is not complete at Markdown.
+For WeChat, map eligible local images into `wechat.md`, store platform variants in `media/platform/wechat/`, then pass the Markdown to `$dbs-wechat-html`. A WeChat job is not complete at Markdown.
 
-1. Read `$gzh-design`'s `theme-index.md`.
-2. Select a registered theme automatically by content type unless the user named one.
-3. Save `layout-decision.md` with theme, article type, component recipe, title, image count, and selection reason.
-4. Read the selected theme library and `common-components.md` completely.
-5. Assemble the clean `<section>…</section>` fragment as `wechat-formatted.html`; use only registered components and inline styles.
-6. Run `validate_gzh_html.py`; fix every ERROR and punctuation WARNING to zero.
-7. Run `wrap_preview.py` to create `wechat-preview.html`.
+1. Read `$dbs-wechat-html` and its `templates/styles.md`.
+2. Select a built-in style automatically by content type unless the user named one.
+3. Save `layout-decision.md` with style id, article type, title, image count, and selection reason.
+4. Generate the clean WeChat-ready HTML as `wechat-formatted.html`.
+5. Generate or copy the local preview as `wechat-preview.html`.
 
 Required completion files: `wechat.md`, `layout-decision.md`, `wechat-formatted.html`, and `wechat-preview.html`.
 

@@ -16,7 +16,7 @@ Default missing choices as follows:
 - Target: both Xiaohongshu and WeChat.
 - Voice: attributed first-person commentary using “我看到 / 我的理解 / 我建议”; never transfer the source author's experiences or achievements to the user.
 - Media: archive originals, inspect them, and contextually recreate useful visuals when reuse rights are unclear.
-- WeChat: complete `$gzh-design` theme layout, validation, and preview; Markdown alone is incomplete.
+- WeChat: complete `$dbs-wechat-html` layout and preview; Markdown alone is incomplete.
 - Publishing: stop at reviewable local outputs until the user explicitly confirms publication.
 
 Initialize each URL once:
@@ -40,8 +40,8 @@ Use `workflow-state.json` as the orchestration ledger. Update a stage only after
 9. Adapt rather than merely translate. Read [references/adaptation.md](references/adaptation.md) and use `content-analysis.md` plus `voice-brief.md` as the brief. Write platform initial drafts.
 10. Use `$humanizer-zh` on each initial draft. Preserve facts, attribution, links, commands, numbers, uncertainty, platform purpose, and the approved first-person boundary. Save the humanized result as the final platform Markdown.
 11. Write outputs under `x-social/<author>-<status-id>/`: `workflow-state.json`, `source.json`, `source.md`, `media-manifest.json`, `media/original/`, `media/adapted/`, `content-analysis.md`, `voice-brief.md`, `xiaohongshu-draft.md`, `xiaohongshu.md`, `wechat-draft.md`, `wechat.md`, `wechat-formatted.html`, and `wechat-preview.html`. Follow [references/workflow.md](references/workflow.md) for stage gates and resume behavior.
-12. For every WeChat output, invoke `$gzh-design`; Markdown alone is not a completed WeChat deliverable. Select a registered theme from its theme index, assemble HTML only from that theme's component library plus its common components, and save `layout-decision.md`, `wechat-formatted.html`, and `wechat-preview.html`.
-13. Run `$gzh-design`'s `validate_gzh_html.py` and fix all errors and punctuation warnings to zero. Generate the preview with `wrap_preview.py`. Do not mark the WeChat branch complete before both steps pass.
+12. For every WeChat output, invoke `$dbs-wechat-html`; Markdown alone is not a completed WeChat deliverable. Select a suitable built-in style such as `minimal`, `stripe`, `github`, `ft`, or `course`, generate the WeChat-ready HTML, and save `layout-decision.md`, `wechat-formatted.html`, and `wechat-preview.html`.
+13. When `$dbs-wechat-html` provides multiple preview styles, choose the best fit for the article and record the style id and reason in `layout-decision.md`. Do not mark the WeChat branch complete before the HTML and preview files exist.
 14. Show the draft, source link, selected theme, validation result, and formatted preview. Publish only after explicit confirmation in the current conversation.
 
 ## Acquisition fallback ladder
@@ -93,7 +93,7 @@ X URL
   -> platform draft -> $humanizer-zh -> final platform Markdown
   -> recreate decisions -> contextual redraw-brief.md -> $baoyu-article-illustrator -> $imagegen
   -> xiaohongshu.md + eligible assets -> $baoyu-xhs-images (optional)
-  -> wechat.md + mapped local assets -> $gzh-design -> layout-decision.md + validated HTML preview (required)
+  -> wechat.md + mapped local assets -> $dbs-wechat-html -> layout-decision.md + WeChat HTML preview (required)
   -> $baoyu-post-to-wechat (only after confirmation)
 ```
 
@@ -114,7 +114,7 @@ For multiple URLs, create one workflow ledger per status. Run acquisition and me
 
 - **Xiaohongshu text note**: Write `xiaohongshu.md` with 3 title options, a strong opening, scannable short paragraphs, a practical takeaway, 5-10 relevant hashtags, and a final attribution line containing the X URL. Use first-person only when clearly framed as commentary; never impersonate the original author.
 - **Xiaohongshu cards**: After the text draft is accepted, use `$baoyu-xhs-images`. Preserve local downloaded media as references when licensing/permission allows; otherwise create original explanatory visuals.
-- **WeChat article**: Write `wechat.md` with frontmatter (`title`, `description`, `author`, `sourceUrl`), a contextual introduction, faithful structured body, editor commentary clearly separated from source claims, and a source note. Then use `$gzh-design` for layout. Let it recommend a registered theme unless the user named one; require its HTML validator to report zero errors and zero punctuation warnings. Use `$baoyu-post-to-wechat` only after confirmation.
+- **WeChat article**: Write `wechat.md` with frontmatter (`title`, `description`, `author`, `sourceUrl`), a contextual introduction, faithful structured body, editor commentary clearly separated from source claims, and a source note. Then use `$dbs-wechat-html` for layout. Let it recommend a built-in style unless the user named one. Use `$baoyu-post-to-wechat` only after confirmation.
 - **Both**: Create the canonical source once, then make two independently adapted drafts. Do not reuse the Xiaohongshu copy as the WeChat body.
 
 ## Safety and fidelity
@@ -130,11 +130,11 @@ For multiple URLs, create one workflow ledger per status. Run acquisition and me
 
 Treat Markdown as the editable content source and generated HTML as a delivery artifact.
 
-- Do not hand-write WeChat component HTML or mix theme components. Follow `$gzh-design` and its registered theme/component libraries.
+- Do not hand-write WeChat component HTML when `$dbs-wechat-html` is available. Follow `$dbs-wechat-html` and its built-in style library.
 - Preserve the X attribution and editorial-disclosure section during layout. Do not let a generated signature imply the original X author wrote or endorsed the Chinese article.
-- Keep the original author's identity in the source note. Use the user's/publication's name only in the publisher signature area; leave `$gzh-design` placeholders when it is unknown.
+- Keep the original author's identity in the source note. Use the user's/publication's name only in the publisher signature area.
 - Ensure every source paragraph and intended image survives the Markdown-to-HTML conversion.
-- Treat `wechat.md` as incomplete until `$gzh-design` produces and validates HTML.
+- Treat `wechat.md` as incomplete until `$dbs-wechat-html` produces HTML and preview output.
 - In automatic workflow runs, select the theme by content type without pausing: tutorials/checklists → 摸鱼绿; case studies → 橄榄手记; analysis/opinion → 红白色系 or 石墨极简风. Record the choice and reason in `layout-decision.md`.
 - Read the selected theme's complete component library and `common-components.md`; never simulate its look with generic hand-written HTML.
 - Deliver `wechat.md`, `layout-decision.md`, the clean formatted HTML, and the preview HTML. Report the selected theme and validation result.

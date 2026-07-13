@@ -68,7 +68,7 @@ def main():
         "defaults": {
             "voice": "attributed-first-person",
             "media": "archive-inspect-contextual-redraw",
-            "wechat_layout": "gzh-design-required",
+            "wechat_layout": "dbs-wechat-html-required",
             "publishing": "preview-only-until-confirmed"
         },
         "created_at": datetime.now(timezone.utc).isoformat(),

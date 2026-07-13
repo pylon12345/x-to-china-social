@@ -68,7 +68,7 @@ Recreation is contextual, not cosmetic: preserve the idea or verified informatio
 ## Platform mapping
 
 - Xiaohongshu: pass accepted copy and eligible local assets to `$baoyu-xhs-images`. Put final cards in `media/platform/xhs/`; source images may be references only when rights allow.
-- WeChat: map intended local images into `wechat.md` before invoking `$gzh-design`. Put final variants in `media/platform/wechat/` and verify that every intended image survives HTML conversion.
+- WeChat: map intended local images into `wechat.md` before invoking `$dbs-wechat-html`. Put final variants in `media/platform/wechat/` and verify that every intended image survives HTML conversion.
 - Update `media-manifest.json` so every derivative records `path`, `kind`, `platform`, `source_asset`, `adaptation_notes`, and `attribution`.
 
 The published source note must cover both the text and any reused source media. Newly generated visuals should be labelled as editorial illustrations when that distinction matters.
