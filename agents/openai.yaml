@@ -1,0 +1,4 @@
+interface:
+  display_name: "X 搬运到小红书/公众号"
+  short_description: "一条工作流完成 X 抓取、改写、重制图片和双平台排版"
+  default_prompt: "Use $x-to-china-social to run the complete workflow for this X URL, including media archival, attributed rewriting, contextual image recreation, Xiaohongshu output, and validated WeChat layout preview."
