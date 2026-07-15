@@ -1,6 +1,6 @@
 ---
 name: x-to-china-social
-description: Runs one resumable end-to-end workflow that fetches public X/Twitter posts, threads, and X Articles; archives and contextually redraws images; diagnoses, rewrites, and humanizes Chinese copy in an attributed first-person voice; creates Xiaohongshu assets; and produces validated GZH-themed WeChat HTML previews. Use when a user provides X URLs or asks to 搬运、翻译、改写、配图、重新制图、排版或发布到小红书/微信公众号.
+description: Runs one resumable end-to-end workflow that fetches public X/Twitter posts, threads, and X Articles; archives and contextually redraws images; diagnoses, rewrites, and humanizes Chinese copy in an attributed first-person voice; creates Xiaohongshu assets; produces validated WeChat HTML previews, archives final articles to Obsidian, and saves image-complete WeChat drafts. Use when a user provides X URLs or asks to 搬运、翻译、改写、配图、重新制图、排版或发布到小红书/微信公众号.
 ---
 
 # X to China Social
@@ -9,23 +9,36 @@ Turn X content into attributed, platform-ready Chinese deliverables through one 
 
 ## Single-entry contract
 
-Accept one or more X URLs and an optional target platform. Do not require the user to invoke any downstream skill separately.
+Accept one or more X URLs and an optional target platform. Do not require the user to invoke any downstream skill separately. Resolve the platform before creating drafts; never generate both platform branches merely because both are supported.
 
 Default missing choices as follows:
 
-- Target: both Xiaohongshu and WeChat.
+- Target: WeChat only when the request does not name a platform. Select Xiaohongshu only when the request names it. Select both only when the request explicitly asks for both.
 - Voice: attributed first-person commentary using “我看到 / 我的理解 / 我建议”; never transfer the source author's experiences or achievements to the user.
 - Media: archive originals, inspect them, and contextually recreate useful visuals when reuse rights are unclear.
-- WeChat: complete `$gzh-design` theme layout, validation, and preview; Markdown alone is incomplete.
+- WeChat: create validated HTML with an available WeChat formatter; Markdown alone is a partial result.
 - Publishing: stop at reviewable local outputs until the user explicitly confirms publication.
+- Delivery: automatically archive selected final Markdown to Obsidian; when WeChat is selected, also save its image-complete branch to the公众号草稿箱. Draft creation is not publication.
 
-Initialize each URL once:
+## Capability preflight
+
+Before invoking a named downstream skill, verify that it is available. Never invent a tool call.
+
+- For diagnosis and humanization, prefer the named skill when callable; otherwise apply the same reference checklist directly and record the fallback.
+- For image recreation or Xiaohongshu cards, finish text outputs when optional image capabilities are absent; do not block unrelated branches.
+- For WeChat HTML, prefer `$gzh-design`; fall back to `$dbs-wechat-html` when available. If neither is callable, deliver `wechat.md` as a partial result and block only `layout`.
+- Publishing remains a separate, explicitly confirmed action.
+
+Read [references/delivery.md](references/delivery.md) before any Obsidian or WeChat draft sync. For the official API path, also read [references/wechat-draft-api.md](references/wechat-draft-api.md) and run its no-network preflight before uploading.
+
+Read [references/platform-routing.md](references/platform-routing.md), resolve exactly one routing outcome, and initialize each URL once. Pass the resolved target explicitly; `--request-text` is available for deterministic trigger tests and defaults to WeChat when no trigger matches.
 
 ```powershell
-python "{baseDir}/scripts/init_workflow.py" "<X URL>" --platform both --root "x-social"
+python "{baseDir}/scripts/init_workflow.py" "<X URL>" --platform wechat --root "x-social"
+python "{baseDir}/scripts/manage_workflow.py" "x-social/<handle>-<status-id>" status
 ```
 
-Use `workflow-state.json` as the orchestration ledger. Update a stage only after its gate passes, record failures and resumable notes, and preserve completed artifacts. Continue automatically through safe stages. Pause only for inaccessible source content, a downstream image skill's required generation confirmation, or final publishing approval.
+Use `workflow-state.json` as the ledger and work only on `current_stage`. Advance a passed gate with `manage_workflow.py <job-dir> complete <stage>`; use `block` and `resume` for inaccessible required input. Preserve completed artifacts.
 
 ## End-to-end workflow
 
@@ -34,15 +47,16 @@ Use `workflow-state.json` as the orchestration ledger. Update a stage only after
 3. Save a canonical source bundle before rewriting. Use `scripts/build_source.py` when structured fields are available. Treat `source.md` as immutable evidence; never rewrite it into platform copy in place.
 4. Verify the bundle: URL/status ID, author handle, non-empty body, thread order, and media count. Mark unavailable metrics or timestamps as unknown; never invent them.
 5. Archive accessible source media with `scripts/save_media.py`, then visually inspect and route each asset using [references/media-workflow.md](references/media-workflow.md). Keep originals immutable; save adaptations separately and record every relationship in `media-manifest.json`. For `recreate`, build `media/redraw-brief.md` from the verified source, content diagnosis, voice brief, accepted copy, and target-platform layout before invoking the illustration skills.
-6. Diagnose `source.md` before writing. Use `$dbs-content` for content type, recommended form/platform, hook/title risks, expression efficiency, and information gap. Save the actionable diagnosis as `content-analysis.md`; do not ask it to write the draft.
-7. Ask for the target only if it is not inferable: Xiaohongshu, WeChat, or both. Default to a draft, not live publishing.
+6. Diagnose `source.md` before writing. Use `$dbs-content` when callable; otherwise fill `content-analysis.md` directly from [references/content-routing.md](references/content-routing.md). Diagnosis is advice, never new evidence.
+7. Resolve the target with [references/platform-routing.md](references/platform-routing.md). Default an unspecified target to WeChat. Do not ask when the default is safe; ask only when the wording is genuinely contradictory. Default to a draft, not live publishing.
 8. Build `voice-brief.md` before drafting. Convert the source into the user's editorial perspective using [references/first-person.md](references/first-person.md). Default to attributed commentary such as “我看到 / 我的理解 / 我准备尝试”; never convert the source author's actions into the user's actions without user-provided evidence.
 9. Adapt rather than merely translate. Read [references/adaptation.md](references/adaptation.md) and use `content-analysis.md` plus `voice-brief.md` as the brief. Write platform initial drafts.
-10. Use `$humanizer-zh` on each initial draft. Preserve facts, attribution, links, commands, numbers, uncertainty, platform purpose, and the approved first-person boundary. Save the humanized result as the final platform Markdown.
-11. Write outputs under `x-social/<author>-<status-id>/`: `workflow-state.json`, `source.json`, `source.md`, `media-manifest.json`, `media/original/`, `media/adapted/`, `content-analysis.md`, `voice-brief.md`, `xiaohongshu-draft.md`, `xiaohongshu.md`, `wechat-draft.md`, `wechat.md`, `wechat-formatted.html`, and `wechat-preview.html`. Follow [references/workflow.md](references/workflow.md) for stage gates and resume behavior.
-12. For every WeChat output, invoke `$gzh-design`; Markdown alone is not a completed WeChat deliverable. Select a registered theme from its theme index, assemble HTML only from that theme's component library plus its common components, and save `layout-decision.md`, `wechat-formatted.html`, and `wechat-preview.html`.
-13. Run `$gzh-design`'s `validate_gzh_html.py` and fix all errors and punctuation warnings to zero. Generate the preview with `wrap_preview.py`. Do not mark the WeChat branch complete before both steps pass.
-14. Show the draft, source link, selected theme, validation result, and formatted preview. Publish only after explicit confirmation in the current conversation.
+10. Humanize each draft with `$humanizer-zh` when callable or a direct fidelity/style pass otherwise. Preserve facts, attribution, links, commands, numbers, uncertainty, platform purpose, and first-person boundaries.
+11. Write common artifacts plus only the selected platform's files under `x-social/<author>-<status-id>/`. Do not create Xiaohongshu placeholders for a WeChat job or WeChat placeholders for a Xiaohongshu job. Follow [references/workflow.md](references/workflow.md) for exact files, stage gates, and resume behavior.
+12. For every WeChat output, use `$gzh-design` when callable or `$dbs-wechat-html` as fallback. Save `layout-decision.md`, `wechat-formatted.html`, and `wechat-preview.html`.
+13. Run the selected formatter's validator. Do not complete `layout` until required files exist and validation passes; if no formatter exists, block only `layout` and report a partial result.
+14. Run the automatic delivery stage from [references/delivery.md](references/delivery.md): export every selected final article to Obsidian. Only when WeChat is selected, upload eligible images and save the formatted article to the公众号草稿箱. Require only receipts applicable to the selected target.
+15. Show the draft, source link, selected theme, validation result, Obsidian destinations, WeChat draft ID, and formatted preview. Publish/send only after explicit confirmation in the current conversation.
 
 ## Acquisition fallback ladder
 
@@ -92,8 +106,10 @@ X URL
   -> first-person positioning -> voice-brief.md
   -> platform draft -> $humanizer-zh -> final platform Markdown
   -> recreate decisions -> contextual redraw-brief.md -> $baoyu-article-illustrator -> $imagegen
-  -> xiaohongshu.md + eligible assets -> $baoyu-xhs-images (optional)
-  -> wechat.md + mapped local assets -> $gzh-design -> layout-decision.md + validated HTML preview (required)
+  -> [if Xiaohongshu] xiaohongshu.md + eligible assets -> $baoyu-xhs-images (optional)
+  -> [if WeChat] wechat.md + mapped local assets -> formatter -> layout-decision.md + validated HTML preview
+  -> final Markdown -> export_to_obsidian.py -> Obsidian notes + obsidian-receipt.json
+  -> [if WeChat] validated HTML + eligible images -> draft publisher -> 公众号草稿箱 + wechat-draft-receipt.json
   -> $baoyu-post-to-wechat (only after confirmation)
 ```
 
@@ -103,18 +119,20 @@ For multiple URLs, create one workflow ledger per status. Run acquisition and me
 
 ## Recognition and rewrite contract
 
-- Use `$dbs-content` as an editorial diagnosis, not as a ghostwriter. Convert its findings into `content-analysis.md` using [references/content-routing.md](references/content-routing.md).
+- Use `$dbs-content` when callable as an editorial diagnosis, not as a ghostwriter; otherwise diagnose directly from the reference template. Convert its findings into `content-analysis.md` using [references/content-routing.md](references/content-routing.md).
 - Treat the diagnosis as advice, not new evidence. Claims may come only from `source.md`, explicit user context, or separately verified sources.
-- Write `*-draft.md` from `source.md` plus the diagnosis. Then use `$humanizer-zh` to produce the final filename without `-draft`.
+- Write `*-draft.md` from `source.md` plus the diagnosis. Then use `$humanizer-zh` when callable, or a direct fidelity/style pass, to produce the final filename without `-draft`.
 - Reject humanizer edits that introduce personal experience, unsupported opinion, false certainty, missing attribution, changed commands, or changed numbers.
 - Compare the final copy against both `source.md` and the initial draft before layout.
 - Use first person only within the modes in [references/first-person.md](references/first-person.md). “Rewrite as me” authorizes voice adaptation, not false ownership of another person's work or experience.
 
 ## Platform routing
 
+Resolve triggers using [references/platform-routing.md](references/platform-routing.md). The presence of platform support in this Skill is never permission to create that platform's branch.
+
 - **Xiaohongshu text note**: Write `xiaohongshu.md` with 3 title options, a strong opening, scannable short paragraphs, a practical takeaway, 5-10 relevant hashtags, and a final attribution line containing the X URL. Use first-person only when clearly framed as commentary; never impersonate the original author.
 - **Xiaohongshu cards**: After the text draft is accepted, use `$baoyu-xhs-images`. Preserve local downloaded media as references when licensing/permission allows; otherwise create original explanatory visuals.
-- **WeChat article**: Write `wechat.md` with frontmatter (`title`, `description`, `author`, `sourceUrl`), a contextual introduction, faithful structured body, editor commentary clearly separated from source claims, and a source note. Then use `$gzh-design` for layout. Let it recommend a registered theme unless the user named one; require its HTML validator to report zero errors and zero punctuation warnings. Use `$baoyu-post-to-wechat` only after confirmation.
+- **WeChat article**: Write `wechat.md` with frontmatter (`title`, `description`, `author`, `sourceUrl`), a contextual introduction, faithful structured body, editor commentary clearly separated from source claims, and a source note. Then use an available WeChat formatter; prefer `$gzh-design` and fall back to `$dbs-wechat-html`. Require its validator to pass. Use `$baoyu-post-to-wechat` automatically for draft creation when callable; require confirmation only for publish/send.
 - **Both**: Create the canonical source once, then make two independently adapted drafts. Do not reuse the Xiaohongshu copy as the WeChat body.
 
 ## Safety and fidelity
@@ -124,17 +142,17 @@ For multiple URLs, create one workflow ledger per status. Run acquisition and me
 - Do not reproduce a paywalled or copyrighted long-form X Article verbatim. Summarize it with short attributed excerpts.
 - Download media only when publicly accessible and needed. Preserve the byte-for-byte original, hash it, and track derivatives; do not remove watermarks or imply ownership.
 - Saving an image locally does not grant republication or adaptation rights. Prefer a new text-derived explanatory visual when rights are unclear.
-- Before live publishing, show destination, account if known, title, media count, and whether the action creates a draft or publishes immediately.
+- Saving to the公众号草稿箱 is automatic after layout. Before live publishing/sending, show destination, account, title, media count, and request explicit confirmation.
 
 ## Layout contract
 
 Treat Markdown as the editable content source and generated HTML as a delivery artifact.
 
-- Do not hand-write WeChat component HTML or mix theme components. Follow `$gzh-design` and its registered theme/component libraries.
+- Do not hand-write WeChat component HTML or mix theme components. Follow the selected formatter's component and validation rules.
 - Preserve the X attribution and editorial-disclosure section during layout. Do not let a generated signature imply the original X author wrote or endorsed the Chinese article.
-- Keep the original author's identity in the source note. Use the user's/publication's name only in the publisher signature area; leave `$gzh-design` placeholders when it is unknown.
+- Keep the original author's identity in the source note. Use the user's/publication's name only in the publisher signature area; leave formatter placeholders when it is unknown.
 - Ensure every source paragraph and intended image survives the Markdown-to-HTML conversion.
-- Treat `wechat.md` as incomplete until `$gzh-design` produces and validates HTML.
-- In automatic workflow runs, select the theme by content type without pausing: tutorials/checklists → 摸鱼绿; case studies → 橄榄手记; analysis/opinion → 红白色系 or 石墨极简风. Record the choice and reason in `layout-decision.md`.
-- Read the selected theme's complete component library and `common-components.md`; never simulate its look with generic hand-written HTML.
+- Treat `wechat.md` as incomplete until an available formatter produces and validates HTML; otherwise report it as partial.
+- When the selected formatter supports registered themes, select one by content type and record the choice and reason in `layout-decision.md`.
+- Read every component or conversion resource required by the selected formatter; never simulate a formatter with generic hand-written HTML.
 - Deliver `wechat.md`, `layout-decision.md`, the clean formatted HTML, and the preview HTML. Report the selected theme and validation result.

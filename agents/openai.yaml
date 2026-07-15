@@ -1,4 +1,4 @@
 interface:
-  display_name: "X 搬运到小红书/公众号"
-  short_description: "一条工作流完成 X 抓取、改写、重制图片和双平台排版"
-  default_prompt: "Use $x-to-china-social to run the complete workflow for this X URL, including media archival, attributed rewriting, contextual image recreation, Xiaohongshu output, and validated WeChat layout preview."
+  display_name: "X 按需改写到公众号或小红书"
+  short_description: "按输入选择平台，归档 Obsidian，并可同步公众号草稿"
+  default_prompt: "Use $x-to-china-social to process this X URL for only the platform named in my request. If I name no platform, create a WeChat draft only. Archive selected outputs to Obsidian."
