@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">X 转中国社媒</title>
+  <desc id="desc">从 X 内容经过箭头转为中文社交媒体气泡</desc>
+  <defs>
+    <linearGradient id="bg" x1="24" y1="20" x2="232" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0EA5A4"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#bg)"/>
+  <path d="M48 61l57 82M103 61l-57 82" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
+  <path d="M94 176h64" fill="none" stroke="#FDE68A" stroke-width="14" stroke-linecap="round"/>
+  <path d="M143 158l21 18-21 18" fill="none" stroke="#FDE68A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M145 56h55a24 24 0 0 1 24 24v39a24 24 0 0 1-24 24h-19l-23 22v-22h-13a24 24 0 0 1-24-24V80a24 24 0 0 1 24-24Z" fill="#fff"/>
+  <path d="M149 85h47M149 108h34" fill="none" stroke="#0F766E" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="210" cy="207" r="18" fill="#EF4444"/>
+</svg>
