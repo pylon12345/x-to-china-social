@@ -21,7 +21,11 @@ def skill_name(path):
 def discover():
     home = Path.home()
     codex_home = Path(os.environ.get("CODEX_HOME", home / ".codex"))
-    roots = [codex_home / "skills", home / ".agents" / "skills"]
+    roots = [
+        codex_home / "skills",
+        home / ".agents" / "skills",
+        home / ".claude" / "skills",
+    ]
     result = {}
     for root in roots:
         if not root.is_dir():
