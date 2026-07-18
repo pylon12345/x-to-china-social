@@ -11,7 +11,7 @@ import socket
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, Request, build_opener, getproxies
 
 from _common import atomic_json, fail
 
@@ -48,6 +48,12 @@ def safe_url(value):
     try:
         addresses = {ipaddress.ip_address(host)}
     except ValueError:
+        # When a proxy handles this scheme, the proxy resolves DNS itself;
+        # local resolution is neither used for the connection nor reliable
+        # (it is often poisoned in exactly the environments that need a
+        # proxy), so only literal-IP hosts are checked in that case.
+        if parsed.scheme in getproxies():
+            return url
         try:
             infos = socket.getaddrinfo(host, None)
         except OSError as exc:
