@@ -1,60 +1,24 @@
-# Content recognition and rewrite brief
+# 内容诊断与去 AI 味
 
-## Diagnosis output
+## 诊断
 
-Save `content-analysis.md` with this structure:
+用 `chinese-social-copywriter` 分析，不让诊断工具代写事实。`content-analysis.md` 至少包含：
 
-```markdown
-# Content analysis
+- 原文核心主张与证据
+- 中国读者需要的上下文
+- 目标平台、受众和阅读场景
+- 可删冗余、需解释术语、潜在争议
+- 推荐结构、标题角度、开头抓手
+- 不能越过的事实与第一人称边界
 
-## Source identity
-- Type: short post / thread / X Article
-- Topic: ...
-- Source language: ...
-- Evidence completeness: complete / limited, with reason
+## 两遍写作
 
-## Editorial diagnosis
-- Content form: opinion / tutorial / case study / list / news / personal story / mixed
-- Core claim: one sentence
-- Reader value: one sentence
-- Information density: low / medium / high
-- Strongest material: 2-5 concrete items from the source
-- Weak or removable material: X-specific debris, repetition, or context that does not travel
+第一遍写 `*-draft.md`：忠实、完整、结构合理。第二遍调用 `humanizer-zh` 写最终稿：
 
-## Routing
-- Xiaohongshu fit: high / medium / low, with reason
-- Recommended Xiaohongshu form: text note / image cards / short video script / skip
-- WeChat fit: high / medium / low, with reason
-- Recommended WeChat form: short article / tutorial / deep article / skip
+- 句长有变化，允许自然停顿和编辑判断。
+- 删除空泛过渡、总结腔、模板化排比、过密小标题。
+- 把术语解释成人话，但不牺牲精确性。
+- 不虚构“我亲测/我经历/我做过”。
+- 不改变数字、代码、命令、链接、引语和不确定性。
 
-## Rewrite brief
-- Target audience: inferred and labeled as inference
-- Hook direction: ...
-- Structure: ...
-- Tone: ...
-- Must preserve: facts, numbers, links, commands, qualifications
-- Must disclose: translation / summary / editorial additions
-- Avoid: fabricated experience, impersonation, hype, unsupported claims
-- First-person mode: attributed commentary / verified experience / neutral summary
-```
-
-## Skill roles
-
-Use `$dbs-content` to produce editorial judgment: format fit, expression efficiency, title/hook risk, information gap, and content problems. Its rule that it does not write content remains in force.
-
-Use the general adaptation rules to write each initial platform draft. Do not ask `$dbs-content` to violate its no-ghostwriting role.
-
-Use `$humanizer-zh` only after the draft exists. Ask it to remove AI-like filler, formulaic contrasts, repetitive headings, excessive bolding, vague attribution, promotional language, and mechanical rhythm while preserving the requested platform style.
-
-## Fidelity check after humanization
-
-Compare initial and final drafts. Fail the gate when the final version:
-
-- changes a number, date, command, path, product name, or URL;
-- turns an inference into a source claim;
-- adds first-person use or results not present in the source;
-- removes the original author or source link;
-- changes uncertainty into certainty;
-- adds a recommendation that could be mistaken for the original author's view.
-
-Read `references/first-person.md` before using “我”.
+终稿必须逐项对照 `source.md` 和初稿，填写 `humanization-report.json`。三个 fidelity checks 任何一个不通过，就回到 rewrite 修复。

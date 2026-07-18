@@ -1,140 +1,119 @@
 ---
 name: x-to-china-social
-description: Runs one resumable end-to-end workflow that fetches public X/Twitter posts, threads, and X Articles; archives and contextually redraws images; diagnoses, rewrites, and humanizes Chinese copy in an attributed first-person voice; creates Xiaohongshu assets; and produces validated GZH-themed WeChat HTML previews. Use when a user provides X URLs or asks to 搬运、翻译、改写、配图、重新制图、排版或发布到小红书/微信公众号.
+description: 将公开 X/Twitter 帖子、线程或长文改写为自然中文的微信公众号或小红书内容；包含来源归档、去 AI 味、基于原文配图的合规改编、公众号排版验证、Obsidian 归档，以及按需保存公众号草稿。用户提供 X 链接或要求搬运、翻译、改写、配图、排版、同步公众号/小红书时使用。
 ---
 
-# X to China Social
+# X to China Social V8.2
 
-Turn X content into attributed, platform-ready Chinese deliverables through one file-based, resumable workflow. This skill is the only user-facing entry point; invoke downstream skills internally. Never claim content was fetched unless its URL, author, and body were verified.
+![X 转中国社媒](assets/icon.svg)
 
-## Single-entry contract
+这是唯一的用户入口。内部调用已安装的下游技能，按文件交接，支持断点续跑。不得声称已抓取、排版或保存草稿，除非相应的机器验收门禁已经通过。
 
-Accept one or more X URLs and an optional target platform. Do not require the user to invoke any downstream skill separately.
+## 默认路由
 
-Default missing choices as follows:
+- 未指定平台：只做微信公众号。
+- 明确说小红书：只做小红书；只有明确说“两边都要”才同时生成。
+- 未明确说“保存/同步到公众号草稿箱”：使用 `fast`，生成本地成品、预览和 Obsidian 归档。
+- 明确要求保存公众号草稿：使用 `full`，在本地验收后同步并读取远端草稿复验。
+- 已完成的 `fast` 任务后来收到“发到草稿”时，重新运行 `init_workflow.py`；脚本会把账本升级为 `full` 并只重开 `sync/review`，不重复抓取、改写或生图。
+- 保存草稿不是发布。群发或正式发布始终需要用户当次明确确认。
 
-- Target: both Xiaohongshu and WeChat.
-- Voice: attributed first-person commentary using “我看到 / 我的理解 / 我建议”; never transfer the source author's experiences or achievements to the user.
-- Media: archive originals, inspect them, and contextually recreate useful visuals when reuse rights are unclear.
-- WeChat: complete `$gzh-design` theme layout, validation, and preview; Markdown alone is incomplete.
-- Publishing: stop at reviewable local outputs until the user explicitly confirms publication.
-
-Initialize each URL once:
-
-```powershell
-python "{baseDir}/scripts/init_workflow.py" "<X URL>" --platform both --root "x-social"
-```
-
-Use `workflow-state.json` as the orchestration ledger. Update a stage only after its gate passes, record failures and resumable notes, and preserve completed artifacts. Continue automatically through safe stages. Pause only for inaccessible source content, a downstream image skill's required generation confirmation, or final publishing approval.
-
-## End-to-end workflow
-
-1. Parse every supplied X URL. Accept `x.com`, `twitter.com`, and `mobile.twitter.com`; normalize to `https://x.com/<user>/status/<id>` when possible.
-2. Acquire the source using the fallback ladder below. For threads, collect the author's contiguous replies in chronological order. For quoted posts, capture enough quoted context to make the source understandable.
-3. Save a canonical source bundle before rewriting. Use `scripts/build_source.py` when structured fields are available. Treat `source.md` as immutable evidence; never rewrite it into platform copy in place.
-4. Verify the bundle: URL/status ID, author handle, non-empty body, thread order, and media count. Mark unavailable metrics or timestamps as unknown; never invent them.
-5. Archive accessible source media with `scripts/save_media.py`, then visually inspect and route each asset using [references/media-workflow.md](references/media-workflow.md). Keep originals immutable; save adaptations separately and record every relationship in `media-manifest.json`. For `recreate`, build `media/redraw-brief.md` from the verified source, content diagnosis, voice brief, accepted copy, and target-platform layout before invoking the illustration skills.
-6. Diagnose `source.md` before writing. Use `$dbs-content` for content type, recommended form/platform, hook/title risks, expression efficiency, and information gap. Save the actionable diagnosis as `content-analysis.md`; do not ask it to write the draft.
-7. Ask for the target only if it is not inferable: Xiaohongshu, WeChat, or both. Default to a draft, not live publishing.
-8. Build `voice-brief.md` before drafting. Convert the source into the user's editorial perspective using [references/first-person.md](references/first-person.md). Default to attributed commentary such as “我看到 / 我的理解 / 我准备尝试”; never convert the source author's actions into the user's actions without user-provided evidence.
-9. Adapt rather than merely translate. Read [references/adaptation.md](references/adaptation.md) and use `content-analysis.md` plus `voice-brief.md` as the brief. Write platform initial drafts.
-10. Use `$humanizer-zh` on each initial draft. Preserve facts, attribution, links, commands, numbers, uncertainty, platform purpose, and the approved first-person boundary. Save the humanized result as the final platform Markdown.
-11. Write outputs under `x-social/<author>-<status-id>/`: `workflow-state.json`, `source.json`, `source.md`, `media-manifest.json`, `media/original/`, `media/adapted/`, `content-analysis.md`, `voice-brief.md`, `xiaohongshu-draft.md`, `xiaohongshu.md`, `wechat-draft.md`, `wechat.md`, `wechat-formatted.html`, and `wechat-preview.html`. Follow [references/workflow.md](references/workflow.md) for stage gates and resume behavior.
-12. For every WeChat output, invoke `$gzh-design`; Markdown alone is not a completed WeChat deliverable. Select a registered theme from its theme index, assemble HTML only from that theme's component library plus its common components, and save `layout-decision.md`, `wechat-formatted.html`, and `wechat-preview.html`.
-13. Run `$gzh-design`'s `validate_gzh_html.py` and fix all errors and punctuation warnings to zero. Generate the preview with `wrap_preview.py`. Do not mark the WeChat branch complete before both steps pass.
-14. Show the draft, source link, selected theme, validation result, and formatted preview. Publish only after explicit confirmation in the current conversation.
-
-## Acquisition fallback ladder
-
-Attempt each viable method until one produces verifiable content. Do not stop after a blocked anonymous HTTP request.
-
-1. **Existing extractor**: Use `$baoyu-danger-x-to-markdown` if callable and the user accepts its reverse-engineered API disclaimer. Treat authentication/rate-limit/empty-body failures as a signal to continue.
-2. **In-app browser**: Use `$browser:control-in-app-browser` to open the canonical URL. If X requests login or hides replies, continue with Chrome.
-3. **Logged-in Chrome**: Use `$chrome:control-chrome` with the user's existing session. Never request, print, or copy cookies/tokens. Wait for the post to render, then extract visible semantic content from the page.
-4. **Manual handoff**: If automation still fails, ask the user to open the URL in their logged-in browser and paste the post/thread text or provide screenshots. Continue from that content and label acquisition as `manual`.
-
-For exact extraction fields, thread rules, and failure diagnosis, read [references/acquisition.md](references/acquisition.md). When a page or screenshot is used, ignore replies from unrelated accounts unless necessary context.
-
-## Canonical source bundle
-
-Create JSON matching this minimum shape:
-
-```json
-{
-  "source_url": "https://x.com/user/status/123",
-  "acquisition": "browser",
-  "author": {"name": "Name", "handle": "@user"},
-  "posts": [{"text": "...", "timestamp": null, "media": []}],
-  "quoted_posts": [],
-  "fetched_at": "ISO-8601"
-}
-```
-
-Run:
+先读 [references/platform-routing.md](references/platform-routing.md)，然后初始化：
 
 ```powershell
-python "{baseDir}/scripts/build_source.py" input.json --output-dir "x-social/123"
+python "{baseDir}/scripts/init_workflow.py" "<X URL>" --platform auto --delivery auto --request-text "<用户原话>" --root "x-social"
+python "{baseDir}/scripts/preflight_capabilities.py" "x-social/<handle>-<status-id>"
+python "{baseDir}/scripts/manage_workflow.py" "x-social/<handle>-<status-id>" complete preflight
 ```
 
-The script validates required fields and writes both `source.json` and `source.md` without changing the source wording.
+只处理 `workflow-state.json` 的 `current_stage`。每阶段完成后运行 `manage_workflow.py <job-dir> complete <stage>`；门禁失败时修复产物，不要手改账本绕过。
 
-## File-based orchestration
+## V8.2 阶段
 
-Use files, not conversational memory, to pass content between skills:
+1. `preflight`：生成 `capability-report.json`。必需技能缺失就阻断，禁止静默降级。
+2. `acquire`：获取并核验原文，生成不可变的 `source.json` 和 `source.md`。
+3. `media`：保存原图、目视检查并在 `media-manifest.json` 给每张图作最终决定。
+4. `diagnose`：用 `chinese-social-copywriter` 生成 `content-analysis.md`，只提供编辑建议，不新增事实。
+5. `voice`：生成 `voice-brief.md`，明确用户视角、受众、语气及第一人称边界。
+6. `rewrite`：先写 `*-draft.md`，强制调用 `humanizer-zh` 生成最终稿和 `humanization-report.json`。
+7. `illustrate`：用原文图片做构图/信息层级参考，生成原创改编图或重绘图及 `illustration-report.json`。
+8. `package_media`：为每个目标平台生成独立贴图发布包，将图片与逐图提示词配对，禁止把提示词写入文章正文。
+9. `layout`：公众号使用 `baoyu-markdown-to-html` 或 `dbs-wechat-html` 生成简洁、杂志、视觉卡片三个候选版本；选择后生成最终 HTML 和 `layout-validation.json`。
+10. `sync`：归档 Obsidian，并将每张生成图的提示词分别保存为独立笔记；仅 `full` 模式保存公众号草稿并验证远端排版。
+11. `review`：核对来源、事实、署名、图片权利、平台文件和收据。
 
-```text
-X URL
-  -> init_workflow.py -> workflow-state.json
-  -> source.json + source.md
-  -> save_media.py -> immutable originals + media-manifest.json
-  -> visual inspection -> reuse / transform / recreate / omit
-  -> $dbs-content -> content-analysis.md
-  -> first-person positioning -> voice-brief.md
-  -> platform draft -> $humanizer-zh -> final platform Markdown
-  -> recreate decisions -> contextual redraw-brief.md -> $baoyu-article-illustrator -> $imagegen
-  -> xiaohongshu.md + eligible assets -> $baoyu-xhs-images (optional)
-  -> wechat.md + mapped local assets -> $gzh-design -> layout-decision.md + validated HTML preview (required)
-  -> $baoyu-post-to-wechat (only after confirmation)
+精确产物、恢复规则和报告格式见 [references/workflow.md](references/workflow.md)。
+
+## 原文获取
+
+依次尝试：
+
+1. 用户接受逆向接口免责声明时使用 `baoyu-danger-x-to-markdown`。
+2. 使用应用内浏览器打开规范化 X URL。
+3. 使用用户已登录的 Chrome 会话；不得索取或输出 cookie/token。
+4. 仍失败时请用户提供正文或截图，并标记 `acquisition=manual`。
+
+线程只收集原作者连续回复；引用帖保留理解正文所需上下文。删除、私密、付费内容不得绕过访问控制。字段规范见 [references/acquisition.md](references/acquisition.md)。结构化数据可运行：
+
+```powershell
+python "{baseDir}/scripts/build_source.py" input.json --output-dir "<job-dir>"
 ```
 
-If `source.md` already exists and passes the verification gate, skip acquisition unless the user asks to refresh it. If a platform draft exists, preserve user edits and update only the requested stage. Never overwrite an existing draft or formatted HTML silently; create a timestamped backup first.
+## 改写与去 AI 味
 
-For multiple URLs, create one workflow ledger per status. Run acquisition and media archival for all reachable URLs first, then finish each platform branch independently. A failed URL must not block the other jobs.
+读 [references/content-routing.md](references/content-routing.md)、[references/first-person.md](references/first-person.md) 和 [references/adaptation.md](references/adaptation.md)。
 
-## Recognition and rewrite contract
+- 初稿只能取材于 `source.md`、用户上下文和另行核验的来源。
+- `humanizer-zh` 是 V8.2 强制环节。不得用“手工简单润色”冒充该技能已运行。
+- 保留数字、命令、链接、引语、限定语和不确定性；不得把原作者经历写成用户经历。
+- 使用“我看到 / 我的理解 / 我更关心的是”这类有署名边界的编辑视角。
+- 发布正文默认不写“某作者分享/某作者认为”，也不设置单独的援引作者段。使用“原文提出/这套做法”的中性表达；文末仅保留规范化原文链接和“摘要改写/翻译整理”声明。作者身份仍保存在 `source.json` 与 Obsidian 元数据中，不得伪装成用户原创。
+- 对照原文、初稿和终稿填 `humanization-report.json`；事实、引语、来源链接三项必须全部通过。
 
-- Use `$dbs-content` as an editorial diagnosis, not as a ghostwriter. Convert its findings into `content-analysis.md` using [references/content-routing.md](references/content-routing.md).
-- Treat the diagnosis as advice, not new evidence. Claims may come only from `source.md`, explicit user context, or separately verified sources.
-- Write `*-draft.md` from `source.md` plus the diagnosis. Then use `$humanizer-zh` to produce the final filename without `-draft`.
-- Reject humanizer edits that introduce personal experience, unsupported opinion, false certainty, missing attribution, changed commands, or changed numbers.
-- Compare the final copy against both `source.md` and the initial draft before layout.
-- Use first person only within the modes in [references/first-person.md](references/first-person.md). “Rewrite as me” authorizes voice adaptation, not false ownership of another person's work or experience.
+## 配图改编
 
-## Platform routing
+读 [references/media-workflow.md](references/media-workflow.md)。原图永远保存为不可变证据；发布图单独输出。
 
-- **Xiaohongshu text note**: Write `xiaohongshu.md` with 3 title options, a strong opening, scannable short paragraphs, a practical takeaway, 5-10 relevant hashtags, and a final attribution line containing the X URL. Use first-person only when clearly framed as commentary; never impersonate the original author.
-- **Xiaohongshu cards**: After the text draft is accepted, use `$baoyu-xhs-images`. Preserve local downloaded media as references when licensing/permission allows; otherwise create original explanatory visuals.
-- **WeChat article**: Write `wechat.md` with frontmatter (`title`, `description`, `author`, `sourceUrl`), a contextual introduction, faithful structured body, editor commentary clearly separated from source claims, and a source note. Then use `$gzh-design` for layout. Let it recommend a registered theme unless the user named one; require its HTML validator to report zero errors and zero punctuation warnings. Use `$baoyu-post-to-wechat` only after confirmation.
-- **Both**: Create the canonical source once, then make two independently adapted drafts. Do not reuse the Xiaohongshu copy as the WeChat body.
+- `reuse`：权利明确，可直接使用。
+- `transform`：权利允许，对原图作必要处理但不去水印。
+- `reference_adapt`：只参考原图的事实、构图关系和信息层级，优先用 `guizang-material-illustration` 规划归藏风解释图；也可用 `baoyu-article-illustrator`/`baoyu-cover-image`，再用 `imagegen` 生成明显原创的新图。
+- `recreate`：不依赖原图像素，从文章事实重新设计解释图；流程图、机制图、数据图优先走 `guizang-material-illustration`。
+- `omit`：无必要、无权利或含敏感信息。
 
-## Safety and fidelity
+每项 `reference_adapt`/`recreate` 必须在 `illustration-report.json` 记录原媒体 ID、提示词文件、输出文件和三项 QA：事实一致、原创性、手机可读性；`skills_used` 记录实际调用技能。需要小红书 3:4 卡片或公众号 21:9 + 1:1 封面时，优先调用 `guizang-social-card-skill`，也可用 `baoyu-xhs-images`；最终图片用 `baoyu-compress-image` 优化。
 
-- Preserve links and attribution. State clearly when content is translated, summarized, or edited.
-- Do not bypass authentication, CAPTCHAs, access controls, deleted/private posts, or account restrictions.
-- Do not reproduce a paywalled or copyrighted long-form X Article verbatim. Summarize it with short attributed excerpts.
-- Download media only when publicly accessible and needed. Preserve the byte-for-byte original, hash it, and track derivatives; do not remove watermarks or imply ownership.
-- Saving an image locally does not grant republication or adaptation rights. Prefer a new text-derived explanatory visual when rights are unclear.
-- Before live publishing, show destination, account if known, title, media count, and whether the action creates a draft or publishes immediately.
+归藏配图必须遵守短中文标签、准确指向、移动端可读和无意外水印规则。文章型内容先生成归藏解释图，再交给社交卡片技能组合；不得用社交卡片技能替代正文改写，也不得用 PPT 技能生成文章配图。
 
-## Layout contract
+每张生成图必须有独立 `prompt_path`。运行 `build_platform_media_package.py <job-dir>`，生成 `platform-media-package.json`，按目标平台逐张配对图片和提示词。图片与提示词属于独立发布资产，不得把完整提示词或提示词链接写入文章正文。`export_to_obsidian.py` 会把提示词逐张写入 `X内容库/_prompts/<handle>-<status-id>/`；`obsidian-receipt.json.prompt_notes` 必须覆盖 `illustration-report.json` 的全部提示词。
 
-Treat Markdown as the editable content source and generated HTML as a delivery artifact.
+## 贴图发布包
 
-- Do not hand-write WeChat component HTML or mix theme components. Follow `$gzh-design` and its registered theme/component libraries.
-- Preserve the X attribution and editorial-disclosure section during layout. Do not let a generated signature imply the original X author wrote or endorsed the Chinese article.
-- Keep the original author's identity in the source note. Use the user's/publication's name only in the publisher signature area; leave `$gzh-design` placeholders when it is unknown.
-- Ensure every source paragraph and intended image survives the Markdown-to-HTML conversion.
-- Treat `wechat.md` as incomplete until `$gzh-design` produces and validates HTML.
-- In automatic workflow runs, select the theme by content type without pausing: tutorials/checklists → 摸鱼绿; case studies → 橄榄手记; analysis/opinion → 红白色系 or 石墨极简风. Record the choice and reason in `layout-decision.md`.
-- Read the selected theme's complete component library and `common-components.md`; never simulate its look with generic hand-written HTML.
-- Deliver `wechat.md`, `layout-decision.md`, the clean formatted HTML, and the preview HTML. Report the selected theme and validation result.
+- 每个平台独立列出图片顺序、图片路径、提示词路径和 SHA-256；双平台可共享原始生成结果，但发布顺序必须分别记录。
+- 贴图包用于平台上传、人工审查和后续自动化，不代表已经发布。远端上传或正式发布仍需对应平台能力与用户当次明确确认。
+- 文章文件只保留面向读者的正文；不得附加生成提示词、内部参数或提示词索引。
+
+## 公众号排版与草稿
+
+读 [references/wechat-layout-profiles.md](references/wechat-layout-profiles.md)、[references/layout-decision-template.md](references/layout-decision-template.md)、[references/delivery.md](references/delivery.md)，完整同步还要读 [references/wechat-draft-api.md](references/wechat-draft-api.md)。
+
+- Markdown 是可编辑内容源，HTML 是交付物；不得用泛化手写 HTML 冒充排版技能。
+- 从同一份 `wechat.md` 生成 `clean`、`editorial`、`visual` 三个候选 HTML，展示预览并选择。选择写入 `layout-selection.json`；只有被选版本复制为 `wechat-formatted.html` 和 `wechat-preview.html`。
+- 用户没有指定时，根据内容类型推荐默认版本，但仍保留三个候选版本。运行：
+
+```powershell
+python "{baseDir}/scripts/select_wechat_layout.py" "<job-dir>" --profile clean --reason "<选择原因>"
+python "{baseDir}/scripts/validate_wechat_layout.py" "<job-dir>" --formatter "<实际技能名>"
+```
+
+- 验证必须确认最终 HTML 与被选候选版本哈希一致、正文匹配、至少 4 个内联样式、至少 1 个带样式标题和 2 个带样式段落。
+- `full` 模式优先用 `baoyu-post-to-wechat`；也可使用官方 API 脚本。保存后必须重新读取远端编辑器内容，验证标题、正文、原文出处、原文链接、改编声明、图片和排版。公开正文不强制显示原作者姓名。
+- 官方 API：`publish_wechat_draft.py` 会自动读取远端草稿复验。浏览器/发布技能路径需导出编辑器 HTML 后运行 `verify_wechat_remote.py`。没有远端样式证据时不得生成成功收据。
+- 微信素材接口只接受 JPG、PNG 或 GIF。预检会阻止 WebP 上传；先用 `baoyu-compress-image` 转换发布副本。更新草稿前脚本会读取旧草稿 ID，若明确返回 `40007 invalid media_id`，自动安全重建草稿。
+
+## 交付约束
+
+- 只生成所选平台的文件；两平台共用一次来源归档，但独立改写。
+- 现有产物优先复用；覆盖用户编辑过的文件前先做时间戳备份。
+- 多 URL 各建一个账本；单个 URL 失败不能阻塞其他 URL。
+- 交付时说明平台、`fast/full` 模式、来源链接、主题、验收结果、Obsidian 位置；`full` 模式还要给草稿 ID 和远端排版验证结果。
+- 不得删除水印、冒充原作者、隐去原文链接或改编声明，或把草稿保存说成正式发布。
