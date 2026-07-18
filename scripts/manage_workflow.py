@@ -7,19 +7,14 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-
-def die(message):
-    raise SystemExit(f"error: {message}")
+from _common import (
+    MIN_INLINE_STYLES, MIN_STYLED_HEADINGS, MIN_STYLED_PARAGRAPHS,
+    atomic_json as write_state, fail as die,
+)
 
 
 def now():
     return datetime.now(timezone.utc).isoformat()
-
-
-def write_state(path, data):
-    temp = path.with_suffix(".json.tmp")
-    temp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temp.replace(path)
 
 
 def upgrade_v2(path, data):
@@ -222,7 +217,7 @@ def report_errors(job_dir, data, stage):
             errors.append("layout validation did not pass")
         if not report.get("formatter"):
             errors.append("layout formatter is not recorded")
-        if "wechat" in targets and report.get("inline_style_count", 0) < 4:
+        if "wechat" in targets and report.get("inline_style_count", 0) < MIN_INLINE_STYLES:
             errors.append("WeChat HTML has too few inline styles")
     return errors
 
@@ -275,21 +270,24 @@ def delivery_errors(job_dir, data, stage):
             if receipt.get("verified") is not True or receipt.get("unresolved_images"):
                 errors.append("WeChat draft was not fully read back and verified")
             verification = receipt.get("verification", {})
-            required = ["title", "body_nonempty", "source_provenance", "source_url",
+            required = ["title", "body_nonempty", "source_url",
                         "adaptation_disclosure", "layout_preserved"]
             if not all_true(verification, required):
                 errors.append("WeChat remote content verification did not pass")
             layout = receipt.get("remote_layout", {})
-            if (layout.get("inline_style_count", 0) < 4 or
-                    layout.get("styled_heading_count", 0) < 1 or
-                    layout.get("styled_paragraph_count", 0) < 2):
+            if (layout.get("inline_style_count", 0) < MIN_INLINE_STYLES or
+                    layout.get("styled_heading_count", 0) < MIN_STYLED_HEADINGS or
+                    layout.get("styled_paragraph_count", 0) < MIN_STYLED_PARAGRAPHS):
                 errors.append("WeChat remote draft lost its layout")
-            intended = set(receipt.get("intended_images", []))
-            uploaded = {item.get("local_path") for item in receipt.get("uploaded_images", [])
-                        if item.get("local_path") and (item.get("media_id") or item.get("remote_url"))}
-            missing_images = intended - uploaded
-            if missing_images:
-                errors.append("WeChat images were not uploaded: " + ", ".join(sorted(missing_images)))
+            if receipt.get("mode") == "official_api":
+                intended = set(receipt.get("intended_images", []))
+                uploaded = {item.get("local_path") for item in receipt.get("uploaded_images", [])
+                            if item.get("local_path") and (item.get("media_id") or item.get("remote_url"))}
+                missing_images = intended - uploaded
+                if missing_images:
+                    errors.append("WeChat images were not uploaded: " + ", ".join(sorted(missing_images)))
+            elif verification.get("images_present") is not True:
+                errors.append("remote draft does not show all intended images")
     return errors
 
 

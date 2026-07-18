@@ -2,11 +2,11 @@
 """Select one generated WeChat layout candidate as the delivery version."""
 
 import argparse
-import hashlib
-import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+
+from _common import atomic_json, atomic_text, digest
 
 
 PROFILES = {
@@ -14,10 +14,6 @@ PROFILES = {
     "editorial": "wechat-layout-editorial.html",
     "visual": "wechat-layout-visual.html",
 }
-
-
-def digest(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def main():
@@ -51,9 +47,7 @@ def main():
         "candidates": candidates,
         "formatted_sha256": digest(formatted),
     }
-    (job_dir / "layout-selection.json").write_text(
-        json.dumps(selection, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    atomic_json(job_dir / "layout-selection.json", selection)
     decision = (
         "# 公众号排版决策\n\n"
         f"- 已选版本：`{args.profile}`\n"
@@ -62,7 +56,7 @@ def main():
         "- 候选版本：`clean`、`editorial`、`visual`\n"
         "- 状态：已选择，等待内容与移动端排版验证\n"
     )
-    (job_dir / "layout-decision.md").write_text(decision, encoding="utf-8")
+    atomic_text(job_dir / "layout-decision.md", decision)
     print(job_dir / "layout-selection.json")
 
 

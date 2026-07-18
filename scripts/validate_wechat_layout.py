@@ -2,13 +2,15 @@
 """Compare WeChat Markdown and formatted HTML, then write layout-validation.json."""
 
 import argparse
-import hashlib
 import json
 import re
 from difflib import SequenceMatcher
-from html import unescape
 from pathlib import Path
 
+from _common import (
+    MIN_INLINE_STYLES, MIN_STYLED_HEADINGS, MIN_STYLED_PARAGRAPHS,
+    atomic_json, digest,
+)
 from publish_wechat_draft import layout_proof, visible_text
 
 
@@ -48,17 +50,16 @@ def main():
     selected_path = job_dir / str(selection.get("selected_file") or "")
     if not selected_path.is_file():
         raise SystemExit("error: selected WeChat layout file is missing")
-    selected_hash = hashlib.sha256(selected_path.read_bytes()).hexdigest()
-    final_hash = hashlib.sha256(html_path.read_bytes()).hexdigest()
-    if selected_hash != final_hash:
+    if digest(selected_path) != digest(html_path):
         raise SystemExit("error: formatted HTML does not match the selected layout version")
     rendered = visible_text(html)
     similarity = SequenceMatcher(None, compact(md), compact(rendered)).ratio()
     proof = layout_proof(html)
     source_match = similarity >= 0.82
     valid = (
-        source_match and proof["inline_style_count"] >= 4 and
-        proof["styled_heading_count"] >= 1 and proof["styled_paragraph_count"] >= 2
+        source_match and proof["inline_style_count"] >= MIN_INLINE_STYLES and
+        proof["styled_heading_count"] >= MIN_STYLED_HEADINGS and
+        proof["styled_paragraph_count"] >= MIN_STYLED_PARAGRAPHS
     )
     report = {
         "valid": valid,
@@ -72,7 +73,7 @@ def main():
         "html": args.html,
     }
     target = job_dir / "layout-validation.json"
-    target.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    atomic_json(target, report)
     print(target)
     raise SystemExit(0 if valid else 2)
 

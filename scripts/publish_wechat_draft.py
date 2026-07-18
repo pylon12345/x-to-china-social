@@ -17,8 +17,12 @@ from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlparse
+from urllib.parse import unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
+
+from _common import (
+    MIN_INLINE_STYLES, MIN_STYLED_HEADINGS, MIN_STYLED_PARAGRAPHS, atomic_json,
+)
 
 
 API = "https://api.weixin.qq.com"
@@ -31,12 +35,6 @@ class PublishError(RuntimeError):
 
 def now():
     return datetime.now(timezone.utc).isoformat()
-
-
-def atomic_json(path, value):
-    temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temp.replace(path)
 
 
 def request_json(method, url, body=None, headers=None, timeout=30):
@@ -183,21 +181,18 @@ def remote_verification(job_dir, local_html, item, expected_title, source_url):
     _author, source_url = source_identity(job_dir, source_url)
     text = visible_text(remote_html)
     disclosure_terms = ("改写", "编译", "整理", "基于", "原文", "来源")
-    minimum_styles = max(4, min(local_layout["inline_style_count"], 12) // 2)
+    minimum_styles = max(MIN_INLINE_STYLES, min(local_layout["inline_style_count"], 12) // 2)
     checks = {
         "title": item.get("title") == expected_title,
         "body_nonempty": remote_layout["text_length"] >= 80,
-        "source_provenance": bool(source_url and (
-            item.get("content_source_url") == source_url or source_url in remote_html
-        )),
         "source_url": bool(source_url and (
             item.get("content_source_url") == source_url or source_url in remote_html
         )),
         "adaptation_disclosure": any(term in text for term in disclosure_terms),
         "layout_preserved": (
             remote_layout["inline_style_count"] >= minimum_styles and
-            remote_layout["styled_heading_count"] >= 1 and
-            remote_layout["styled_paragraph_count"] >= 2
+            remote_layout["styled_heading_count"] >= MIN_STYLED_HEADINGS and
+            remote_layout["styled_paragraph_count"] >= MIN_STYLED_PARAGRAPHS
         ),
     }
     return checks, remote_layout, local_layout
@@ -207,7 +202,7 @@ def local_path(src, html_path):
     parsed = urlparse(unescape(src))
     if parsed.scheme.lower() not in {"", "file"}:
         return None
-    raw = parsed.path
+    raw = unquote(parsed.path)
     if parsed.scheme == "file" and re.match(r"^/[A-Za-z]:", raw):
         raw = raw[1:]
     path = Path(raw.replace("/", os.sep))
@@ -241,6 +236,25 @@ def upload(token, path, endpoint):
     body, headers = multipart(path)
     separator = "&" if "?" in endpoint else "?"
     return request_json("POST", f"{API}{endpoint}{separator}access_token={token}", body, headers)
+
+
+def relative_key(path, job_dir):
+    return str(path.relative_to(job_dir)).replace("\\", "/")
+
+
+def reusable_uploads(prior, images, job_dir):
+    """Map original src -> prior upload record for images whose bytes are unchanged."""
+    by_local = {
+        item["local_path"]: item
+        for item in prior.get("uploaded_images", [])
+        if item.get("local_path") and item.get("remote_url") and item.get("sha256")
+    }
+    result = {}
+    for original, path in images:
+        item = by_local.get(relative_key(path, job_dir))
+        if item and item["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest():
+            result[original] = item
+    return result
 
 
 def unsupported_images(images, cover):
@@ -353,7 +367,7 @@ def main():
     secret = os.environ.get("WECHAT_APP_SECRET", "")
     if not app_id or (not secret and not os.environ.get("WECHAT_ACCESS_TOKEN")):
         raise SystemExit("error: set WECHAT_APP_ID and WECHAT_APP_SECRET (or WECHAT_ACCESS_TOKEN)")
-    prior_id = None
+    prior, prior_id = {}, None
     if receipt_path.is_file() and not args.force_create:
         prior = json.loads(receipt_path.read_text(encoding="utf-8-sig"))
         if prior.get("account") != account:
@@ -363,6 +377,10 @@ def main():
 
     draft_id = prior_id
     stale_prior_id = False
+    reusable = reusable_uploads(prior, images, job_dir)
+    cover_sha = hashlib.sha256(cover.read_bytes()).hexdigest()
+    replacements, uploaded = {}, []
+    cover_receipt = None
     try:
         token, token_source = access_token(app_id, secret)
         if prior_id:
@@ -375,17 +393,33 @@ def main():
                 if "errcode=40007" not in str(exc):
                     raise
                 prior_id, draft_id, stale_prior_id = None, None, True
-        replacements, uploaded = {}, []
         for original, path in images:
+            if original in reusable:
+                item = reusable[original]
+                replacements[original] = item["remote_url"]
+                uploaded.append(item)
+                continue
             result = upload(token, path, "/cgi-bin/media/uploadimg")
             if not result.get("url"):
                 raise PublishError(f"inline upload returned no URL for {path.name}")
-            local = str(path.relative_to(job_dir)).replace("\\", "/")
             replacements[original] = result["url"]
-            uploaded.append({"local_path": local, "media_id": None, "remote_url": result["url"]})
-        cover_result = upload(token, cover, "/cgi-bin/material/add_material?type=image")
-        if not cover_result.get("media_id"):
-            raise PublishError("cover upload returned no media_id")
+            uploaded.append({
+                "local_path": relative_key(path, job_dir), "media_id": None,
+                "remote_url": result["url"],
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            })
+        prior_cover = prior.get("cover") or {}
+        if (prior_cover.get("media_id") and prior_cover.get("local_path") == str(cover)
+                and prior_cover.get("sha256") == cover_sha):
+            cover_receipt = prior_cover
+        else:
+            cover_result = upload(token, cover, "/cgi-bin/material/add_material?type=image")
+            if not cover_result.get("media_id"):
+                raise PublishError("cover upload returned no media_id")
+            cover_receipt = {
+                "local_path": str(cover), "media_id": cover_result["media_id"],
+                "remote_url": cover_result.get("url"), "sha256": cover_sha,
+            }
         remote_html = html
         for original, remote in replacements.items():
             remote_html = remote_html.replace(original, remote)
@@ -397,7 +431,7 @@ def main():
             "title": title[:64], "author": args.author[:16],
             "digest": (args.digest or facts.description or facts.first_p).strip()[:120],
             "content": body_fragment(remote_html), "content_source_url": source_url,
-            "thumb_media_id": cover_result["media_id"],
+            "thumb_media_id": cover_receipt["media_id"],
             "need_open_comment": 0, "only_fans_can_comment": 0,
         }
         if prior_id:
@@ -425,10 +459,7 @@ def main():
             "status": "draft_saved", "mode": "official_api", "operation": operation,
             "draft_id": draft_id, "account": account, "app_id_suffix": app_id[-6:],
             "html": args.html, "saved_at": now(), "content_sha256": fingerprint,
-            "title": article["title"], "cover": {
-                "local_path": str(cover), "media_id": cover_result["media_id"],
-                "remote_url": cover_result.get("url"),
-            },
+            "title": article["title"], "cover": cover_receipt,
             "intended_images": intended, "uploaded_images": uploaded,
             "unresolved_images": [], "verified": True,
             "verification": verification,
@@ -438,11 +469,13 @@ def main():
         })
         print(receipt_path)
     except PublishError as exc:
+        done = {item["local_path"] for item in uploaded}
         atomic_json(receipt_path, {
             "status": "failed", "mode": "official_api", "draft_id": draft_id,
             "account": account, "html": args.html, "failed_at": now(),
             "content_sha256": fingerprint, "intended_images": intended,
-            "uploaded_images": [], "unresolved_images": intended,
+            "uploaded_images": uploaded, "cover": cover_receipt,
+            "unresolved_images": sorted(set(intended) - done),
             "verified": False, "error": str(exc),
             "retry_safety": "Inspect the account before force-creating after an ambiguous timeout.",
         })

@@ -12,16 +12,14 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
+from _common import atomic_json, fail
+
 
 PRESERVED_FIELDS = {
     "rights_review", "watermark", "decision", "derivatives", "classification",
     "contains_private_data", "private_information", "factual_role", "inspection_notes",
     "decision_reason", "reference_use", "adaptation_constraints",
 }
-
-
-def fail(message):
-    raise SystemExit(f"error: {message}")
 
 
 def iter_media(data):
@@ -35,6 +33,9 @@ def iter_media(data):
 
 
 def safe_url(value):
+    # ponytail: blocks literal private/loopback IPs only; hostnames resolving to
+    # private ranges are not checked. Add DNS resolution here if this ever runs
+    # against untrusted manifests outside a local archival workflow.
     url = str(value).strip()
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
@@ -184,9 +185,7 @@ def main():
         "policy": "Originals are immutable. Republishing or adapting requires a separate rights review.",
         "items": records,
     }
-    temp = manifest_path.with_suffix(".json.tmp")
-    temp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temp.replace(manifest_path)
+    atomic_json(manifest_path, manifest)
     saved = sum(item["download_status"] == "saved" for item in records)
     print(f"saved {saved}/{len(records)} media files; manifest: {manifest_path.resolve()}")
 

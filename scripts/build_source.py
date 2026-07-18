@@ -7,14 +7,8 @@ import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
 
-
-ALLOWED_HOSTS = {"x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"}
-
-
-def fail(message):
-    raise SystemExit(f"error: {message}")
+from _common import fail, parse_status_url
 
 
 def normalize_handle(value):
@@ -25,12 +19,10 @@ def normalize_handle(value):
 
 
 def canonicalize(url, author_handle):
-    parsed = urlparse(str(url or "").strip())
-    host = parsed.netloc.lower().split(":", 1)[0]
-    match = re.fullmatch(r"/([^/]+)/status/(\d+)(?:/.*)?", parsed.path.rstrip("/"))
-    if parsed.scheme not in {"http", "https"} or host not in ALLOWED_HOSTS or not match:
+    parsed = parse_status_url(url)
+    if not parsed:
         fail("source_url must contain /<handle>/status/<id> on x.com or twitter.com")
-    url_handle, status_id = match.groups()
+    url_handle, status_id = parsed
     if url_handle.lower() != author_handle.lower():
         fail(f"source URL handle @{url_handle} does not match author.handle @{author_handle}")
     return f"https://x.com/{url_handle}/status/{status_id}", status_id

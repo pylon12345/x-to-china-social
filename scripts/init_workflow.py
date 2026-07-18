@@ -2,21 +2,18 @@
 """Initialize one target-aware, delivery-aware V8.2 workflow."""
 
 import argparse
-import json
-import re
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
+
+from _common import atomic_json, parse_status_url
+from manage_workflow import load as load_ledger
 
 
 def canonicalize(raw):
-    parsed = urlparse(raw.strip())
-    host = parsed.netloc.lower().split(":", 1)[0]
-    allowed = {"x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"}
-    match = re.fullmatch(r"/([^/]+)/status/(\d+)(?:/.*)?", parsed.path.rstrip("/"))
-    if parsed.scheme not in {"http", "https"} or host not in allowed or not match:
+    parsed = parse_status_url(raw)
+    if not parsed:
         raise SystemExit("error: expected an X/Twitter status URL containing /<handle>/status/<id>")
-    handle, status_id = match.groups()
+    handle, status_id = parsed
     if handle.lower() in {"i", "home", "explore", "search"}:
         raise SystemExit("error: status URL must include the author's handle")
     return f"https://x.com/{handle}/status/{status_id}", handle, status_id
@@ -138,9 +135,7 @@ def upgrade_delivery(state_path, state, requested_mode, selection_mode, request_
         state["current_stage"] = "sync"
         state["overall_status"] = "in_progress"
     state["updated_at"] = datetime.now(timezone.utc).isoformat()
-    temp = state_path.with_suffix(".json.tmp")
-    temp.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temp.replace(state_path)
+    atomic_json(state_path, state)
     return True
 
 
@@ -164,7 +159,7 @@ def main():
     job_dir.mkdir(parents=True, exist_ok=True)
     state_path = job_dir / "workflow-state.json"
     if state_path.exists():
-        state = json.loads(state_path.read_text(encoding="utf-8"))
+        _, state = load_ledger(job_dir)
         if state.get("source_url") != source_url:
             raise SystemExit("error: existing workflow has a different source URL")
         requested_mode, selection_mode = resolve_delivery(args.delivery, args.request_text)
@@ -207,7 +202,7 @@ def main():
         },
         "created_at": timestamp, "updated_at": timestamp, "stages": stages,
     }
-    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    atomic_json(state_path, state)
     print(state_path.resolve())
 
 

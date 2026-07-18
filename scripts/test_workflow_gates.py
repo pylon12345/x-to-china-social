@@ -73,7 +73,7 @@ class WorkflowGateTests(unittest.TestCase):
             "verified": True, "unresolved_images": [], "intended_images": [],
             "uploaded_images": [],
             "verification": {
-                "title": True, "body_nonempty": True, "source_provenance": True,
+                "title": True, "body_nonempty": True,
                 "source_url": True, "adaptation_disclosure": True,
                 "layout_preserved": False,
             },

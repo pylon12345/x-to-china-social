@@ -2,7 +2,6 @@
 """Export final platform Markdown and local images into an Obsidian vault."""
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -10,17 +9,26 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
+from _common import atomic_json, atomic_text, digest, fail
+
 
 IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 INVALID_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
-def fail(message):
-    raise SystemExit(f"error: {message}")
-
-
-def digest(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def resolve_image(job_dir, raw_value):
+    """Resolve a Markdown image target to a local file inside the job, or None for remote."""
+    value = raw_value.strip().strip("<>")
+    if re.match(r"^(?:https?://|data:|obsidian:)", value, re.I):
+        return None
+    source = (job_dir / value).resolve()
+    try:
+        source.relative_to(job_dir.resolve())
+    except ValueError:
+        fail(f"image path escapes the job directory: {value}")
+    if not source.is_file():
+        fail(f"referenced local image is missing: {source}")
+    return source
 
 
 def discover_vault(explicit):
@@ -107,16 +115,9 @@ def copy_images(
 
     def replace(match):
         alt, raw = match.groups()
-        value = raw.strip().strip("<>")
-        if re.match(r"^(?:https?://|data:|obsidian:)", value, re.I):
+        source = resolve_image(source_dir, raw)
+        if source is None:
             return match.group(0)
-        source = (source_dir / value).resolve()
-        try:
-            source.relative_to(source_dir.resolve())
-        except ValueError:
-            fail(f"image path escapes the job directory: {value}")
-        if not source.is_file():
-            fail(f"referenced local image is missing: {source}")
         name = safe_filename(source.stem, 80) + source.suffix.lower()
         if name.lower() in collision_names:
             name = safe_filename(f"{platform}-{source.stem}", 80) + source.suffix.lower()
@@ -210,9 +211,7 @@ def copy_prompt_notes(job_dir, source, vault, folder, previous_notes, created_at
             source_path.read_text(encoding="utf-8"), source, item, title, created_at
         )
         destination.parent.mkdir(parents=True, exist_ok=True)
-        temp = destination.with_suffix(destination.suffix + ".tmp")
-        temp.write_text(note, encoding="utf-8")
-        temp.replace(destination)
+        atomic_text(destination, note)
         saved.append({
             "source_media_id": item.get("source_media_id"),
             "mode": item.get("mode"),
@@ -299,16 +298,9 @@ def main():
     for platform, article_path in platforms:
         original = article_path.read_text(encoding="utf-8")
         for match in IMAGE_RE.finditer(original):
-            value = match.group(2).strip().strip("<>")
-            if re.match(r"^(?:https?://|data:|obsidian:)", value, re.I):
+            image = resolve_image(job_dir, match.group(2))
+            if image is None:
                 continue
-            image = (job_dir / value).resolve()
-            try:
-                image.relative_to(job_dir)
-            except ValueError:
-                fail(f"image path escapes the job directory: {value}")
-            if not image.is_file():
-                fail(f"referenced local image is missing: {image}")
             name = (safe_filename(image.stem, 80) + image.suffix.lower()).lower()
             destination_sources.setdefault(name, set()).add(digest(image))
     collision_names = {
@@ -332,9 +324,7 @@ def main():
         )
         note = render_note(body, source, platform, title, timestamp)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        temp = destination.with_suffix(destination.suffix + ".tmp")
-        temp.write_text(note, encoding="utf-8")
-        temp.replace(destination)
+        atomic_text(destination, note)
         items.append({
             "platform": platform,
             "source": str(article_path),
@@ -351,9 +341,7 @@ def main():
         "items": items,
         "prompt_notes": prompt_notes,
     }
-    temp = receipt_path.with_suffix(".json.tmp")
-    temp.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temp.replace(receipt_path)
+    atomic_json(receipt_path, receipt)
     print(receipt_path.resolve())
 
 

@@ -31,8 +31,11 @@ def main():
     checks, remote_layout, local_layout = remote_verification(
         job_dir, local_html, item, args.title, source_url
     )
-    failed = [name for name, passed in checks.items() if not passed]
     intended = [str(path.relative_to(job_dir)).replace("\\", "/") for _, path in images]
+    # The editor export cannot prove per-image uploads; verify that the remote
+    # draft renders at least as many images as the local HTML intends.
+    checks["images_present"] = remote_layout["image_count"] >= len(intended)
+    failed = [name for name, passed in checks.items() if not passed]
     receipt = {
         "status": "draft_saved" if not failed else "failed",
         "mode": args.mode,
@@ -42,10 +45,7 @@ def main():
         "saved_at": datetime.now(timezone.utc).isoformat(),
         "title": args.title,
         "intended_images": intended,
-        "uploaded_images": [
-            {"local_path": path, "media_id": None, "remote_url": "verified-in-editor"}
-            for path in intended
-        ],
+        "uploaded_images": [],
         "unresolved_images": unresolved,
         "verified": not failed and not unresolved,
         "verification": checks,

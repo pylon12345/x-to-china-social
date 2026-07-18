@@ -2,14 +2,11 @@
 """Build platform-specific image/prompt bundles kept separate from article copy."""
 
 import argparse
-import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-
-def fail(message):
-    raise SystemExit(f"error: {message}")
+from _common import atomic_json, digest, fail
 
 
 def load_json(path, label):
@@ -28,10 +25,6 @@ def managed_file(job_dir, value, label):
     if not path.is_file():
         fail(f"missing {label}: {value}")
     return path
-
-
-def digest(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def main():
@@ -77,9 +70,7 @@ def main():
         "platforms": platform_items,
     }
     destination = job_dir / "platform-media-package.json"
-    temp = destination.with_suffix(".json.tmp")
-    temp.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temp.replace(destination)
+    atomic_json(destination, output)
     print(destination)
 
 
