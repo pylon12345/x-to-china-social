@@ -40,6 +40,31 @@ class PlatformMediaPackageTests(unittest.TestCase):
             self.assertEqual(item["prompt_path"], "media/card.prompt.md")
             self.assertFalse(package["platforms"]["wechat"]["article_contains_prompts"])
 
+    def test_platform_specific_selection_and_order(self):
+        with tempfile.TemporaryDirectory() as raw:
+            job = Path(raw)
+            for name in ("a.jpg", "b.jpg", "a.md", "b.md"):
+                (job / name).write_text(name, encoding="utf-8")
+            (job / "workflow-state.json").write_text(json.dumps({
+                "targets": ["wechat", "xiaohongshu"],
+            }), encoding="utf-8")
+            (job / "illustration-report.json").write_text(json.dumps({
+                "status": "passed",
+                "items": [
+                    {"output_path": "a.jpg", "prompt_path": "a.md",
+                     "platforms": ["wechat", "xiaohongshu"],
+                     "platform_order": {"xiaohongshu": 9}},
+                    {"output_path": "b.jpg", "prompt_path": "b.md",
+                     "platforms": ["xiaohongshu"]},
+                ],
+            }), encoding="utf-8")
+            subprocess.run([sys.executable, str(SCRIPT), str(job)], check=True)
+            package = json.loads((job / "platform-media-package.json").read_text(encoding="utf-8"))
+        wechat = [item["image_path"] for item in package["platforms"]["wechat"]["items"]]
+        xhs = [item["image_path"] for item in package["platforms"]["xiaohongshu"]["items"]]
+        self.assertEqual(wechat, ["a.jpg"])
+        self.assertEqual(xhs, ["b.jpg", "a.jpg"])
+
     def test_rejects_full_prompt_embedded_in_article(self):
         with tempfile.TemporaryDirectory() as raw:
             job = Path(raw)

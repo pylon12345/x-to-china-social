@@ -7,10 +7,11 @@ import ipaddress
 import json
 import mimetypes
 import re
+import socket
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from _common import atomic_json, fail
 
@@ -33,21 +34,39 @@ def iter_media(data):
 
 
 def safe_url(value):
-    # ponytail: blocks literal private/loopback IPs only; hostnames resolving to
-    # private ranges are not checked. Add DNS resolution here if this ever runs
-    # against untrusted manifests outside a local archival workflow.
+    """Reject URLs whose host (literal or resolved) is not publicly routable.
+
+    ponytail: addresses are validated at check time, not pinned for the actual
+    request, so a DNS-rebinding server could still flip records between the two
+    lookups. Pin the connection address if this ever archives hostile sources.
+    """
     url = str(value).strip()
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
-    if parsed.scheme not in {"http", "https"} or not host or host == "localhost":
-        fail(f"unsupported media URL: {url}")
+    if parsed.scheme not in {"http", "https"} or not host:
+        raise RuntimeError(f"unsupported media URL: {url}")
     try:
-        address = ipaddress.ip_address(host)
+        addresses = {ipaddress.ip_address(host)}
     except ValueError:
-        address = None
-    if address and (address.is_private or address.is_loopback or address.is_link_local or address.is_reserved):
-        fail(f"refusing local/private media URL: {url}")
+        try:
+            infos = socket.getaddrinfo(host, None)
+        except OSError as exc:
+            raise RuntimeError(f"cannot resolve media host {host}: {exc}")
+        addresses = {ipaddress.ip_address(info[4][0]) for info in infos}
+    if not addresses or not all(address.is_global for address in addresses):
+        raise RuntimeError(f"refusing non-public media URL: {url}")
     return url
+
+
+class SafeRedirects(HTTPRedirectHandler):
+    """Re-validate every redirect target before following it."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        safe_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+OPENER = build_opener(SafeRedirects)
 
 
 def extension(url, content_type=None):
@@ -128,7 +147,7 @@ def main():
     records = []
 
     for index, (collection, post_index, media_index, item) in enumerate(iter_media(data), 1):
-        url = safe_url(item["url"])
+        url = str(item["url"]).strip()
         key = (collection, post_index, media_index)
         previous = previous_records.get(key)
         if previous and previous.get("source_url") != url:
@@ -152,8 +171,9 @@ def main():
             records.append(record)
             continue
         try:
+            safe_url(url)
             request = Request(url, headers={"User-Agent": "Mozilla/5.0 (media archival workflow)"})
-            with urlopen(request, timeout=args.timeout) as response:
+            with OPENER.open(request, timeout=args.timeout) as response:
                 mime_type = response.headers.get_content_type()
                 if not (mime_type.startswith("image/") or mime_type.startswith("video/") or mime_type == "application/octet-stream"):
                     raise RuntimeError(f"unexpected media content type: {mime_type}")

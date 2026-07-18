@@ -38,11 +38,21 @@ def main():
         fail("illustration report has not passed")
 
     platform_items = {}
-    for platform in state.get("targets", []):
+    targets = state.get("targets", [])
+    for platform in targets:
         article_path = job_dir / f"{platform}.md"
         article = article_path.read_text(encoding="utf-8-sig") if article_path.is_file() else ""
         items = []
-        for order, source in enumerate(report.get("items", []), start=1):
+        # Each illustration item may declare "platforms" (default: all targets)
+        # and "platform_order" ({platform: n}, default: report order), so the
+        # two platforms can ship different image sets in different orders.
+        selected = [
+            (item.get("platform_order", {}).get(platform, index), index, item)
+            for index, item in enumerate(report.get("items", []))
+            if platform in (item.get("platforms") or targets)
+        ]
+        selected.sort(key=lambda entry: entry[:2])
+        for order, (_, _, source) in enumerate(selected, start=1):
             image_path = managed_file(job_dir, source.get("output_path"), "image")
             prompt_path = managed_file(job_dir, source.get("prompt_path"), "prompt")
             prompt_text = prompt_path.read_text(encoding="utf-8-sig").strip()

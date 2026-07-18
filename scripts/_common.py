@@ -14,6 +14,15 @@ MIN_STYLED_PARAGRAPHS = 2
 
 STATUS_HOSTS = {"x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"}
 
+# Every skill the illustrate stage may legitimately record in skills_used.
+# Union of the illustration-related preflight groups in
+# preflight_capabilities.py (planner, cover, renderer, optimizer, cards).
+ILLUSTRATION_SKILLS = {
+    "guizang-material-illustration", "guizang-social-card-skill",
+    "baoyu-article-illustrator", "baoyu-cover-image", "baoyu-xhs-images",
+    "imagegen", "baoyu-compress-image",
+}
+
 
 def fail(message):
     raise SystemExit(f"error: {message}")

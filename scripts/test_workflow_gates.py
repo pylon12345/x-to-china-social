@@ -57,6 +57,22 @@ class WorkflowGateTests(unittest.TestCase):
         errors = report_errors(self.job, self.data, {"id": "illustrate"})
         self.assertTrue(any("skills_used" in error for error in errors))
 
+    def test_layout_gate_is_skipped_for_xiaohongshu_only(self):
+        data = {"targets": ["xiaohongshu"], "delivery": {"mode": "fast"}}
+        self.assertEqual(report_errors(self.job, data, {"id": "layout"}), [])
+
+    def test_illustrate_accepts_renderer_and_optimizer_skills(self):
+        write(self.job / "illustration-report.json", {
+            "status": "passed",
+            "skills_used": ["guizang-material-illustration", "imagegen", "baoyu-compress-image"],
+            "items": [],
+            "qa": {
+                "facts_preserved": True, "originality": True,
+                "mobile_readability": True,
+            },
+        })
+        self.assertEqual(report_errors(self.job, self.data, {"id": "illustrate"}), [])
+
     def test_fast_mode_does_not_require_wechat_receipt(self):
         write(self.job / "obsidian-receipt.json", {
             "status": "saved", "items": [{"platform": "wechat"}],

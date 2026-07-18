@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from _common import (
-    MIN_INLINE_STYLES, MIN_STYLED_HEADINGS, MIN_STYLED_PARAGRAPHS,
-    atomic_json as write_state, fail as die,
+    ILLUSTRATION_SKILLS, MIN_INLINE_STYLES, MIN_STYLED_HEADINGS,
+    MIN_STYLED_PARAGRAPHS, atomic_json as write_state, fail as die,
 )
 
 
@@ -164,12 +164,8 @@ def report_errors(job_dir, data, stage):
         report = read_json(job_dir / "illustration-report.json", "illustration report")
         if report.get("status") != "passed":
             errors.append("illustration report did not pass")
-        allowed_skills = {
-            "guizang-material-illustration", "guizang-social-card-skill",
-            "baoyu-article-illustrator", "baoyu-cover-image", "baoyu-xhs-images",
-        }
         used_skills = set(report.get("skills_used", []))
-        if not used_skills or not used_skills.issubset(allowed_skills):
+        if not used_skills or not used_skills.issubset(ILLUSTRATION_SKILLS):
             errors.append("illustration report must record supported skills_used")
         qa = report.get("qa", {})
         if not all_true(qa, ["facts_preserved", "originality", "mobile_readability"]):
@@ -204,7 +200,7 @@ def report_errors(job_dir, data, stage):
                     relative = item.get(key)
                     if not relative or not (job_dir / relative).is_file():
                         errors.append(f"{platform} media item {index} lacks {key}")
-    elif stage_id == "layout":
+    elif stage_id == "layout" and "wechat" in targets:
         report = read_json(job_dir / "layout-validation.json", "layout validation")
         selection = read_json(job_dir / "layout-selection.json", "layout selection")
         if selection.get("status") != "selected":
@@ -217,7 +213,7 @@ def report_errors(job_dir, data, stage):
             errors.append("layout validation did not pass")
         if not report.get("formatter"):
             errors.append("layout formatter is not recorded")
-        if "wechat" in targets and report.get("inline_style_count", 0) < MIN_INLINE_STYLES:
+        if report.get("inline_style_count", 0) < MIN_INLINE_STYLES:
             errors.append("WeChat HTML has too few inline styles")
     return errors
 
