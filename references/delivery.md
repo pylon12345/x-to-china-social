@@ -3,7 +3,7 @@
 ## fast（默认）
 
 1. 将所选平台最终 Markdown 归档到 Obsidian。
-2. 读取 `illustration-report.json`，把每个 `prompt_path` 分别保存为 Obsidian 独立笔记，并在平台归档笔记末尾加入提示词链接。
+2. 读取 `platform-media-package.json`，按平台交付有序贴图包；读取 `illustration-report.json`，把每个 `prompt_path` 分别保存为 Obsidian 独立笔记，不在文章笔记中加入提示词或提示词链接。
 3. 生成 `obsidian-receipt.json`，`status=saved`；`items` 覆盖全部目标平台，`prompt_notes` 覆盖全部生成图提示词。
 4. 公众号提供本地 `wechat-preview.html`，不登录公众号、不上传图片、不写草稿收据。
 

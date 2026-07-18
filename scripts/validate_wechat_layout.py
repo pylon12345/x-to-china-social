@@ -2,6 +2,7 @@
 """Compare WeChat Markdown and formatted HTML, then write layout-validation.json."""
 
 import argparse
+import hashlib
 import json
 import re
 from difflib import SequenceMatcher
@@ -37,6 +38,20 @@ def main():
         raise SystemExit("error: WeChat Markdown or formatted HTML is missing")
     md = markdown_text(md_path.read_text(encoding="utf-8-sig"))
     html = html_path.read_text(encoding="utf-8-sig")
+    selection_path = job_dir / "layout-selection.json"
+    if not selection_path.is_file():
+        raise SystemExit("error: select a WeChat layout version before validation")
+    selection = json.loads(selection_path.read_text(encoding="utf-8-sig"))
+    selected_profile = selection.get("selected_profile")
+    if selection.get("status") != "selected" or selected_profile not in {"clean", "editorial", "visual"}:
+        raise SystemExit("error: invalid WeChat layout selection")
+    selected_path = job_dir / str(selection.get("selected_file") or "")
+    if not selected_path.is_file():
+        raise SystemExit("error: selected WeChat layout file is missing")
+    selected_hash = hashlib.sha256(selected_path.read_bytes()).hexdigest()
+    final_hash = hashlib.sha256(html_path.read_bytes()).hexdigest()
+    if selected_hash != final_hash:
+        raise SystemExit("error: formatted HTML does not match the selected layout version")
     rendered = visible_text(html)
     similarity = SequenceMatcher(None, compact(md), compact(rendered)).ratio()
     proof = layout_proof(html)
@@ -50,6 +65,8 @@ def main():
         "source_match": source_match,
         "text_similarity": round(similarity, 4),
         "formatter": args.formatter,
+        "selected_profile": selected_profile,
+        "selected_file": selection.get("selected_file"),
         **proof,
         "markdown": args.markdown,
         "html": args.html,

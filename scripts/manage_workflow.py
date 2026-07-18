@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and advance an x-to-china-social V8 workflow ledger."""
+"""Validate and advance an x-to-china-social V8.2 workflow ledger."""
 
 import argparse
 import hashlib
@@ -143,9 +143,11 @@ def report_errors(job_dir, data, stage):
     if stage_id == "preflight":
         report = read_json(job_dir / "capability-report.json", "capability report")
         if report.get("status") != "ready" or report.get("required_missing"):
-            errors.append("required V8 skills are missing")
+            errors.append("required V8.2 skills are missing")
         if report.get("workflow_version") != 8:
-            errors.append("capability report is not for workflow V8")
+            errors.append("capability report schema is not version 8")
+        if report.get("release_version") != "8.2":
+            errors.append("capability report is not for release V8.2")
     elif stage_id == "media":
         manifest = read_json(job_dir / "media-manifest.json", "media manifest")
         allowed = {"reuse", "transform", "reference_adapt", "recreate", "omit"}
@@ -167,6 +169,13 @@ def report_errors(job_dir, data, stage):
         report = read_json(job_dir / "illustration-report.json", "illustration report")
         if report.get("status") != "passed":
             errors.append("illustration report did not pass")
+        allowed_skills = {
+            "guizang-material-illustration", "guizang-social-card-skill",
+            "baoyu-article-illustrator", "baoyu-cover-image", "baoyu-xhs-images",
+        }
+        used_skills = set(report.get("skills_used", []))
+        if not used_skills or not used_skills.issubset(allowed_skills):
+            errors.append("illustration report must record supported skills_used")
         qa = report.get("qa", {})
         if not all_true(qa, ["facts_preserved", "originality", "mobile_readability"]):
             errors.append("illustration QA did not pass")
@@ -184,8 +193,31 @@ def report_errors(job_dir, data, stage):
                     relative = item.get(key)
                     if not relative or not (job_dir / relative).is_file():
                         errors.append(f"illustration {media_id} lacks {key}")
+    elif stage_id == "package_media":
+        package = read_json(job_dir / "platform-media-package.json", "platform media package")
+        if package.get("status") != "ready":
+            errors.append("platform media package is not ready")
+        packaged_targets = set(package.get("platforms", {}))
+        missing_targets = set(targets) - packaged_targets
+        if missing_targets:
+            errors.append("platform media package is missing: " + ", ".join(sorted(missing_targets)))
+        for platform, payload in package.get("platforms", {}).items():
+            if payload.get("article_contains_prompts") is not False:
+                errors.append(f"{platform} article must not contain image prompts")
+            for index, item in enumerate(payload.get("items", []), start=1):
+                for key in ("image_path", "prompt_path"):
+                    relative = item.get(key)
+                    if not relative or not (job_dir / relative).is_file():
+                        errors.append(f"{platform} media item {index} lacks {key}")
     elif stage_id == "layout":
         report = read_json(job_dir / "layout-validation.json", "layout validation")
+        selection = read_json(job_dir / "layout-selection.json", "layout selection")
+        if selection.get("status") != "selected":
+            errors.append("WeChat layout version has not been selected")
+        if selection.get("selected_profile") not in {"clean", "editorial", "visual"}:
+            errors.append("WeChat layout selection uses an unsupported profile")
+        if report.get("selected_profile") != selection.get("selected_profile"):
+            errors.append("layout validation does not match the selected profile")
         if report.get("valid") is not True or report.get("source_match") is not True:
             errors.append("layout validation did not pass")
         if not report.get("formatter"):

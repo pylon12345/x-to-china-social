@@ -59,8 +59,8 @@ class ObsidianExportTests(unittest.TestCase):
                 self.assertTrue(destination.is_file())
                 self.assertIn("## 完整提示词", destination.read_text(encoding="utf-8"))
             article = Path(receipt["items"][0]["destination"]).read_text(encoding="utf-8")
-            self.assertIn("## 配图提示词", article)
-            self.assertEqual(article.count("X内容库/_prompts/"), 2)
+            self.assertNotIn("X内容库/_prompts/", article)
+            self.assertNotIn("配图提示词", article)
 
 
 if __name__ == "__main__":

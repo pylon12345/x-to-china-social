@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for V8 report and remote-layout gates."""
+"""Regression tests for V8.2 report and remote-layout gates."""
 
 import json
 import tempfile
@@ -33,6 +33,29 @@ class WorkflowGateTests(unittest.TestCase):
             },
         })
         self.assertEqual(report_errors(self.job, self.data, {"id": "rewrite"}), [])
+
+    def test_guizang_illustration_skill_is_accepted(self):
+        write(self.job / "illustration-report.json", {
+            "status": "passed",
+            "skills_used": ["guizang-material-illustration"],
+            "items": [],
+            "qa": {
+                "facts_preserved": True, "originality": True,
+                "mobile_readability": True,
+            },
+        })
+        self.assertEqual(report_errors(self.job, self.data, {"id": "illustrate"}), [])
+
+    def test_illustration_requires_skills_used(self):
+        write(self.job / "illustration-report.json", {
+            "status": "passed", "items": [],
+            "qa": {
+                "facts_preserved": True, "originality": True,
+                "mobile_readability": True,
+            },
+        })
+        errors = report_errors(self.job, self.data, {"id": "illustrate"})
+        self.assertTrue(any("skills_used" in error for error in errors))
 
     def test_fast_mode_does_not_require_wechat_receipt(self):
         write(self.job / "obsidian-receipt.json", {

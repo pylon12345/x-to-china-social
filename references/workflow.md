@@ -1,21 +1,22 @@
-# V8 产物与门禁
+# V8.2 产物与门禁
 
 每个 X 状态建立独立目录。`workflow-state.json` 是唯一账本，不要跨阶段补写状态。
 
 | 阶段 | 必需产物 | 完成条件 |
 |---|---|---|
-| preflight | `capability-report.json` | `status=ready`、`workflow_version=8`、无缺失技能 |
+| preflight | `capability-report.json` | `status=ready`、`workflow_version=8`、`release_version=8.2`、无缺失技能 |
 | acquire | `source.json`, `source.md` | URL、作者、非空正文、线程顺序、媒体数已核验 |
 | media | `media-manifest.json` | 每项决定为 `reuse/transform/reference_adapt/recreate/omit` |
 | diagnose | `content-analysis.md` | 受众、主张、结构、风险、平台策略清楚 |
 | voice | `voice-brief.md` | 视角、语气、受众、第一人称边界清楚 |
 | rewrite | 平台初稿与终稿、`humanization-report.json` | 每个目标都通过；事实、引语、链接保真 |
-| illustrate | `illustration-report.json` | 所有改编/重绘图有 prompt、输出与 QA |
-| layout | 公众号四件套 | 格式器已记录，正文匹配且样式阈值通过 |
+| illustrate | `illustration-report.json` | 记录 `skills_used`；所有改编/重绘图有 prompt、输出与 QA |
+| package_media | `platform-media-package.json` | 每个平台的图片与提示词逐张配对；文章不包含提示词 |
+| layout | 三个候选 HTML、`layout-selection.json`、公众号四件套 | 已选择一个候选；最终 HTML 哈希一致、正文匹配且样式阈值通过 |
 | sync | `obsidian-receipt.json`；full 公众号另需草稿收据 | 平台稿与每张配图提示词均归档；远端草稿内容和样式复验通过 |
 | review | 无新增强制文件 | 全部已完成阶段重新验证通过 |
 
-公众号四件套：`layout-decision.md`、`layout-validation.json`、`wechat-formatted.html`、`wechat-preview.html`。
+公众号四件套：`layout-decision.md`、`layout-validation.json`、`wechat-formatted.html`、`wechat-preview.html`；另保留三个候选 HTML 和 `layout-selection.json`。
 
 ## 报告最小格式
 
@@ -24,6 +25,7 @@
 ```json
 {
   "status": "passed",
+  "skills_used": ["guizang-material-illustration", "guizang-social-card-skill"],
   "skill": "humanizer-zh",
   "targets": [{"target": "wechat", "status": "passed"}],
   "fidelity_checks": {

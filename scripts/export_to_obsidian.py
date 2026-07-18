@@ -226,7 +226,7 @@ def copy_prompt_notes(job_dir, source, vault, folder, previous_notes, created_at
     return saved
 
 
-def render_note(body, source, platform, title, created_at, prompt_notes=None):
+def render_note(body, source, platform, title, created_at):
     metadata = [
         "---",
         f"title: {json.dumps(title, ensure_ascii=False)}",
@@ -243,15 +243,7 @@ def render_note(body, source, platform, title, created_at, prompt_notes=None):
         f"<!-- x-to-china-social managed: {source.get('status_id', '')}:{platform} -->",
         "",
     ]
-    rendered = "\n".join(metadata) + body.rstrip()
-    if prompt_notes:
-        links = [
-            f"- [[{Path(item['vault_path']).with_suffix('').as_posix()}|"
-            f"{safe_filename(Path(item['destination']).stem)}]]"
-            for item in prompt_notes
-        ]
-        rendered += "\n\n## 配图提示词\n\n" + "\n".join(links)
-    return rendered + "\n"
+    return "\n".join(metadata) + body.rstrip() + "\n"
 
 
 def selected_platforms(job_dir, requested):
@@ -338,7 +330,7 @@ def main():
             strip_frontmatter(original), job_dir, vault, asset_folder,
             (old_item or {}).get("assets", []), platform, collision_names,
         )
-        note = render_note(body, source, platform, title, timestamp, prompt_notes)
+        note = render_note(body, source, platform, title, timestamp)
         destination.parent.mkdir(parents=True, exist_ok=True)
         temp = destination.with_suffix(destination.suffix + ".tmp")
         temp.write_text(note, encoding="utf-8")

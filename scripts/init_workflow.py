@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Initialize one target-aware, delivery-aware V8 workflow."""
+"""Initialize one target-aware, delivery-aware V8.2 workflow."""
 
 import argparse
 import json
@@ -30,6 +30,8 @@ def stage_definitions(targets, delivery_mode="fast"):
     if "wechat" in targets:
         rewrite.extend(["wechat-draft.md", "wechat.md"])
         layout.extend([
+            "wechat-layout-clean.html", "wechat-layout-editorial.html",
+            "wechat-layout-visual.html", "layout-selection.json",
             "layout-decision.md", "layout-validation.json",
             "wechat-formatted.html", "wechat-preview.html",
         ])
@@ -44,6 +46,7 @@ def stage_definitions(targets, delivery_mode="fast"):
         ("voice", ["voice-brief.md"]),
         ("rewrite", rewrite),
         ("illustrate", ["illustration-report.json"]),
+        ("package_media", ["platform-media-package.json"]),
         ("layout", layout),
         ("sync", sync),
         ("review", []),
@@ -186,7 +189,7 @@ def main():
         for index, (name, artifacts) in enumerate(stage_definitions(targets, delivery_mode))
     ]
     state = {
-        "workflow": "x-to-china-social", "version": 8,
+        "workflow": "x-to-china-social", "version": 8, "release_version": "8.2",
         "source_url": source_url, "status_id": status_id, "source_handle": f"@{handle}",
         "targets": targets,
         "platform_selection": {

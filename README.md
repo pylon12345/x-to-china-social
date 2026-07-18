@@ -39,7 +39,8 @@
 | `voice` | 确定视角、语气和第一人称边界 | `voice-brief.md` |
 | `rewrite` | 生成平台稿并去 AI 味 | `wechat.md` / `xiaohongshu.md`、`humanization-report.json` |
 | `illustrate` | 生成原创改编图并进行 QA | `illustration-report.json`、图片与提示词 |
-| `layout` | 生成并验证公众号 HTML | `wechat-formatted.html`、`wechat-preview.html`、验证报告 |
+| `package_media` | 生成各平台独立贴图包 | `platform-media-package.json` |
+| `layout` | 生成简洁、杂志、视觉卡片三个公众号版本并选择 | 三个候选 HTML、选择记录、最终预览与验证报告 |
 | `sync` | 归档 Obsidian，按需保存公众号草稿 | Obsidian 与草稿收据 |
 | `review` | 重新验证全部已完成阶段 | 最终交付检查 |
 
@@ -64,6 +65,7 @@ git clone https://github.com/pylon12345/x-to-china-social.git "$HOME/.codex/skil
 重启或刷新 Agent 的技能列表后，确认 `$x-to-china-social` 可用。该 Skill 会编排若干下游技能；运行前置检查后，会明确列出当前环境缺少的能力。典型依赖包括：
 
 - `chinese-social-copywriter`、`humanizer-zh`
+- `guizang-material-illustration`、`guizang-social-card-skill`（优先）
 - `baoyu-article-illustrator`、`baoyu-cover-image`、`imagegen`
 - `baoyu-markdown-to-html` 或 `dbs-wechat-html`
 - `baoyu-compress-image`
@@ -136,6 +138,9 @@ x-social/<handle>-<status-id>/
 ├── wechat.md / xiaohongshu.md
 ├── humanization-report.json
 ├── illustration-report.json
+├── platform-media-package.json
+├── wechat-layout-clean.html / editorial.html / visual.html
+├── layout-selection.json
 ├── layout-validation.json
 ├── wechat-formatted.html
 ├── wechat-preview.html
@@ -217,6 +222,7 @@ git clone https://github.com/pylon12345/x-to-china-social.git "$HOME/.codex/skil
 Restart or refresh the Agent skill registry, then confirm that `$x-to-china-social` is available. This skill orchestrates downstream skills; its preflight report identifies any missing capability. Typical dependencies include:
 
 - `chinese-social-copywriter`, `humanizer-zh`
+- `guizang-material-illustration`, `guizang-social-card-skill` (preferred)
 - `baoyu-article-illustrator`, `baoyu-cover-image`, `imagegen`
 - `baoyu-markdown-to-html` or `dbs-wechat-html`
 - `baoyu-compress-image`

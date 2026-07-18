@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write a deterministic V8 capability report before source acquisition."""
+"""Write a deterministic V8.2 capability report before source acquisition."""
 
 import argparse
 import json
@@ -50,15 +50,15 @@ def main():
     groups = {
         "diagnosis": ["dbs-content", "chinese-social-copywriter"],
         "humanizer": ["humanizer-zh"],
-        "illustration_planner": ["baoyu-article-illustrator"],
-        "cover_planner": ["baoyu-cover-image"],
+        "illustration_planner": ["guizang-material-illustration", "baoyu-article-illustrator"],
+        "cover_planner": ["guizang-social-card-skill", "baoyu-cover-image"],
         "image_renderer": ["imagegen"],
         "image_optimizer": ["baoyu-compress-image"],
     }
     if "wechat" in targets:
         groups["wechat_formatter"] = ["baoyu-markdown-to-html", "dbs-wechat-html"]
     if "xiaohongshu" in targets:
-        groups["xiaohongshu_cards"] = ["baoyu-xhs-images"]
+        groups["xiaohongshu_cards"] = ["guizang-social-card-skill", "baoyu-xhs-images"]
     if delivery == "full" and "wechat" in targets:
         groups["wechat_publisher"] = ["baoyu-post-to-wechat"]
 
@@ -71,6 +71,7 @@ def main():
     report = {
         "status": "ready" if not missing else "blocked",
         "workflow_version": 8,
+        "release_version": "8.2",
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "targets": targets,
         "delivery_mode": delivery,

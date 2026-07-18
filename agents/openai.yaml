@@ -1,5 +1,5 @@
 interface:
-  display_name: "X 转公众号/小红书 V8.1"
+  display_name: "X 转公众号/小红书 V8.2"
   short_description: "自然中文改写、原创配图、提示词归档与草稿验收"
   icon_small: "./assets/icon.svg"
   icon_large: "./assets/icon.svg"
