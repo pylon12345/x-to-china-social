@@ -46,7 +46,23 @@ class WorkflowGateTests(unittest.TestCase):
         })
         self.assertEqual(report_errors(self.job, self.data, {"id": "illustrate"}), [])
 
-    def test_illustration_requires_skills_used(self):
+    def test_illustrate_passes_with_no_adapted_media_and_no_skills(self):
+        write(self.job / "media-manifest.json", {
+            "items": [{"id": "media-01", "decision": "omit"}],
+        })
+        write(self.job / "illustration-report.json", {
+            "status": "passed", "skills_used": [], "items": [],
+            "qa": {
+                "facts_preserved": True, "originality": True,
+                "mobile_readability": True,
+            },
+        })
+        self.assertEqual(report_errors(self.job, self.data, {"id": "illustrate"}), [])
+
+    def test_illustration_requires_skills_used_when_media_was_adapted(self):
+        write(self.job / "media-manifest.json", {
+            "items": [{"id": "media-01", "decision": "recreate"}],
+        })
         write(self.job / "illustration-report.json", {
             "status": "passed", "items": [],
             "qa": {

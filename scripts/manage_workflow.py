@@ -165,7 +165,7 @@ def report_errors(job_dir, data, stage):
         if report.get("status") != "passed":
             errors.append("illustration report did not pass")
         used_skills = set(report.get("skills_used", []))
-        if not used_skills or not used_skills.issubset(ILLUSTRATION_SKILLS):
+        if not used_skills.issubset(ILLUSTRATION_SKILLS):
             errors.append("illustration report must record supported skills_used")
         qa = report.get("qa", {})
         if not all_true(qa, ["facts_preserved", "originality", "mobile_readability"]):
@@ -177,6 +177,8 @@ def report_errors(job_dir, data, stage):
                 item.get("id") for item in manifest.get("items", manifest.get("media", []))
                 if item.get("decision") in {"reference_adapt", "recreate"}
             }
+            if expected and not used_skills:
+                errors.append("illustration report must record supported skills_used")
             outputs = {item.get("source_media_id"): item for item in report.get("items", [])}
             for media_id in expected:
                 item = outputs.get(media_id, {})
