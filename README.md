@@ -21,6 +21,7 @@
 - **智能平台路由**：默认生成微信公众号内容；明确指定小红书或双平台时才切换。
 - **自然中文改写**：先分析内容，再通过 `humanizer-zh` 去除生硬翻译腔和常见 AI 表达。
 - **来源可追溯**：保存规范化原文链接、作者元数据、正文、线程顺序和媒体清单。
+- **低成本获取**：先查本地哈希缓存；未命中时只抓一次，原始 Markdown 由脚本直接规范化，长文按索引分块，避免模型重复吞全文。
 - **原创配图改编**：参考原图的事实、构图关系和信息层级，重新生成适合中文读者的新图。
 - **提示词独立归档**：每张生成图的完整提示词分别保存为 Obsidian 笔记，并反向链接到文章。
 - **公众号排版验收**：验证正文、标题、段落、内联样式和图片，不把“生成了 HTML”当作排版完成。
@@ -33,7 +34,7 @@
 | 阶段 | 作用 | 主要产物 |
 |---|---|---|
 | `preflight` | 检查必需技能与运行能力 | `capability-report.json` |
-| `acquire` | 获取并核验原文 | `source.json`、`source.md` |
+| `acquire` | 缓存优先，单次获取并核验原文 | `source.json`、`source.md`、`source-index.json` |
 | `media` | 保存原图并决定复用、改编或省略 | `media-manifest.json` |
 | `diagnose` | 分析受众、主张、结构和风险 | `content-analysis.md` |
 | `voice` | 确定视角、语气和第一人称边界 | `voice-brief.md` |
@@ -132,6 +133,8 @@ x-social/<handle>-<status-id>/
 ├── capability-report.json
 ├── source.json
 ├── source.md
+├── source-index.json
+├── source-parts/                 # 仅长文
 ├── media-manifest.json
 ├── content-analysis.md
 ├── voice-brief.md
@@ -179,6 +182,7 @@ This is not a blind “copy and repost” script. Source material, media, rewrit
 - **Conditional platform routing**: WeChat by default; Xiaohongshu or both only when requested.
 - **Natural Chinese rewriting**: content diagnosis followed by mandatory `humanizer-zh` cleanup.
 - **Traceable provenance**: canonical URL, author metadata, text, thread order, and media inventory.
+- **Low-cost acquisition**: hash-based cache probes, one extractor pass, deterministic Markdown import, and indexed long-source chunks prevent repeated full-text ingestion.
 - **Original illustration adaptation**: preserve factual and structural cues while creating a visibly new design.
 - **Prompt archiving**: every generated image prompt becomes a separate Obsidian note linked from the article.
 - **WeChat layout validation**: checks styled headings, paragraphs, inline CSS, body fidelity, and images.
@@ -191,7 +195,7 @@ This is not a blind “copy and repost” script. Source material, media, rewrit
 | Stage | Purpose | Main artifacts |
 |---|---|---|
 | `preflight` | Verify required skills and capabilities | `capability-report.json` |
-| `acquire` | Acquire and validate the source | `source.json`, `source.md` |
+| `acquire` | Reuse a valid cache or acquire once and validate | `source.json`, `source.md`, `source-index.json` |
 | `media` | Preserve media and choose reuse/adaptation policy | `media-manifest.json` |
 | `diagnose` | Analyze audience, claims, structure, and risks | `content-analysis.md` |
 | `voice` | Define point of view, tone, and first-person boundaries | `voice-brief.md` |

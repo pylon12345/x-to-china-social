@@ -11,6 +11,8 @@
 - 推荐结构、标题角度、开头抓手
 - 不能越过的事实与第一人称边界
 
+先读 `source-index.json`。短来源只展开一次 `source.md`；长来源按索引逐段处理并把稳定结论写入 `content-analysis.md`。rewrite 阶段复用该分析，只按需回看对应 source part；禁止再次同时载入 `source-raw.md`、`source.json` 和 `source.md`。
+
 ## 两遍写作
 
 第一遍写 `*-draft.md`：忠实、完整、结构合理。第二遍调用 `humanizer-zh` 写最终稿：

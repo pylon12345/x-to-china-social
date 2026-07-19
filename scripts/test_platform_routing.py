@@ -40,6 +40,7 @@ class PlatformRoutingTests(unittest.TestCase):
         wechat_full = dict(stage_definitions(["wechat"], "full"))
         xhs = dict(stage_definitions(["xiaohongshu"], "fast"))
         self.assertIn("humanization-report.json", wechat_fast["rewrite"])
+        self.assertIn("source-index.json", wechat_fast["acquire"])
         self.assertIn("layout-validation.json", wechat_fast["layout"])
         self.assertIn("layout-selection.json", wechat_fast["layout"])
         self.assertIn("wechat-layout-clean.html", wechat_fast["layout"])

@@ -31,7 +31,7 @@ python "{baseDir}/scripts/manage_workflow.py" "x-social/<handle>-<status-id>" co
 ## V8.2 阶段
 
 1. `preflight`：生成 `capability-report.json`。必需技能缺失就阻断，禁止静默降级。
-2. `acquire`：获取并核验原文，生成不可变的 `source.json` 和 `source.md`。
+2. `acquire`：先查缓存，再单次获取并核验原文，生成不可变的 `source.json`、`source.md` 和轻量索引 `source-index.json`。
 3. `media`：保存原图、目视检查并在 `media-manifest.json` 给每张图作最终决定。
 4. `diagnose`：用 `chinese-social-copywriter` 生成 `content-analysis.md`，只提供编辑建议，不新增事实。
 5. `voice`：生成 `voice-brief.md`，明确用户视角、受众、语气及第一人称边界。
@@ -46,18 +46,31 @@ python "{baseDir}/scripts/manage_workflow.py" "x-social/<handle>-<status-id>" co
 
 ## 原文获取
 
-依次尝试：
+先探测已有来源，不要把正文读进上下文：
 
-1. 用户接受逆向接口免责声明时使用 `baoyu-danger-x-to-markdown`。
-2. 使用应用内浏览器打开规范化 X URL。
-3. 使用用户已登录的 Chrome 会话；不得索取或输出 cookie/token。
-4. 仍失败时请用户提供正文或截图，并标记 `acquisition=manual`。
+```powershell
+python "{baseDir}/scripts/build_source.py" --check-existing --source-url "<X URL>" --output-dir "<job-dir>"
+```
 
-线程只收集原作者连续回复；引用帖保留理解正文所需上下文。删除、私密、付费内容不得绕过访问控制。字段规范见 [references/acquisition.md](references/acquisition.md)。结构化数据可运行：
+- 返回 `cache=hit`：直接完成 acquire；不得重新抓取或重新读取 `source.json`。
+- 返回码 3：缓存未命中，继续下面的单次抓取。
+
+用户接受逆向接口免责声明后，调用 `baoyu-danger-x-to-markdown` **一次**，指定 `--json` 和明确输出路径，但不要传 `--download-media`。获取阶段只保存远程媒体 URL；下载、识图和权利判断留到 media 阶段。将获取器生成的 Markdown 直接交给脚本，不要让模型先阅读全文再手工组装 JSON：
+
+```powershell
+# 获取器输出到 <job-dir>/source-raw.md 后：
+python "{baseDir}/scripts/build_source.py" "<job-dir>/source-raw.md" --source-url "<X URL>" --output-dir "<job-dir>"
+```
+
+获取器成功并通过 `build_source.py` 校验后立即停止，不再打开浏览器复核。只有获取器失败或字段不完整时，才选择**一种**浏览器路径：优先应用内浏览器；若必须使用登录态，改用用户已登录的 Chrome。两种浏览器不要串行都试。浏览器仍失败时请用户提供正文或截图，并标记 `acquisition=manual`。不得索取或输出 cookie/token。
+
+每个 URL 最多进行 2 次机器获取尝试（获取器一次、浏览器一次）。成功即停；不要采集互动数，不要展开推荐回复。线程只收集原作者连续回复；引用帖只保留理解正文不可缺少的上下文。删除、私密、付费内容不得绕过访问控制。字段规范见 [references/acquisition.md](references/acquisition.md)。手工或浏览器得到结构化 JSON 时仍可运行：
 
 ```powershell
 python "{baseDir}/scripts/build_source.py" input.json --output-dir "<job-dir>"
 ```
+
+后续阶段先读 `source-index.json`。`reading_strategy=single_pass` 时只读 `source.md` 一次；`indexed_parts` 时按 `parts` 顺序读取 `source-parts/`，不要再重复读取 `source-raw.md` 或完整 `source.json`。`source.json` 只用于机器校验、媒体保存和最终事实抽查。
 
 ## 改写与去 AI 味
 

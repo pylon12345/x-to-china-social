@@ -37,7 +37,7 @@ def stage_definitions(targets, delivery_mode="fast"):
     rewrite.append("humanization-report.json")
     return [
         ("preflight", ["capability-report.json"]),
-        ("acquire", ["source.json", "source.md"]),
+        ("acquire", ["source.json", "source.md", "source-index.json"]),
         ("media", ["media-manifest.json"]),
         ("diagnose", ["content-analysis.md"]),
         ("voice", ["voice-brief.md"]),

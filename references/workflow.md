@@ -5,7 +5,7 @@
 | 阶段 | 必需产物 | 完成条件 |
 |---|---|---|
 | preflight | `capability-report.json` | `status=ready`、`workflow_version=8`、`release_version=8.2`、无缺失技能 |
-| acquire | `source.json`, `source.md` | URL、作者、非空正文、线程顺序、媒体数已核验 |
+| acquire | `source.json`, `source.md`, `source-index.json` | URL、作者、非空正文、线程顺序、媒体数和来源哈希已核验 |
 | media | `media-manifest.json` | 每项决定为 `reuse/transform/reference_adapt/recreate/omit` |
 | diagnose | `content-analysis.md` | 受众、主张、结构、风险、平台策略清楚 |
 | voice | `voice-brief.md` | 视角、语气、受众、第一人称边界清楚 |
@@ -69,6 +69,9 @@
 ## 性能
 
 - 默认 `fast`，不登录公众号、不上传图片、不等待草稿回读。
-- 来源和原图存在且哈希一致时复用。
+- acquire 必须先运行缓存探测；来源和索引哈希一致时复用，不调用网络工具。
+- 获取器每个 URL 只运行一次且不下载媒体；失败后只选一种浏览器兜底，成功即停。
+- 获取器原始 Markdown 由 `build_source.py` 直接导入，模型不得为了改格式而阅读全文。
+- 后续先读 `source-index.json`；短文只读一次 `source.md`，长文按索引分块读，避免同时展开 raw/JSON/Markdown 三份正文。
 - 两个平台共用 acquire/media/diagnose，但 rewrite/layout 独立。
 - 只有明确要求草稿箱时才走 `full`；远端同步不得与本地创作阶段串行反复重试。

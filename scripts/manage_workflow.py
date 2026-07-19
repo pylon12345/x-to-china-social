@@ -143,6 +143,32 @@ def report_errors(job_dir, data, stage):
             errors.append("capability report schema is not version 8")
         if report.get("release_version") != "8.2":
             errors.append("capability report is not for release V8.2")
+    elif stage_id == "acquire":
+        source_path = job_dir / "source.json"
+        markdown_path = job_dir / "source.md"
+        index_path = job_dir / "source-index.json"
+        # V8.2 ledgers created before the acquisition optimization did not
+        # require an index. Preserve their completed evidence; new ledgers
+        # list source-index.json as a required artifact and take this gate.
+        if not index_path.is_file() and "source-index.json" not in stage.get("required_artifacts", []):
+            return errors
+        index = read_json(index_path, "source index")
+        source = read_json(source_path, "source evidence")
+        if index.get("status") != "ready":
+            errors.append("source index is not ready")
+        if source.get("status_id") != data.get("status_id"):
+            errors.append("source status ID does not match the workflow")
+        if source.get("source_url") != data.get("source_url"):
+            errors.append("source URL does not match the workflow")
+        if index.get("source_json_sha256") != hashlib.sha256(source_path.read_bytes()).hexdigest():
+            errors.append("source.json hash does not match the source index")
+        if index.get("source_markdown_sha256") != hashlib.sha256(markdown_path.read_bytes()).hexdigest():
+            errors.append("source.md hash does not match the source index")
+        if index.get("reading_strategy") not in {"single_pass", "indexed_parts"}:
+            errors.append("source index has no supported reading strategy")
+        for relative in index.get("parts", []):
+            if not relative or not (job_dir / relative).is_file():
+                errors.append(f"source index references a missing part: {relative}")
     elif stage_id == "media":
         manifest = read_json(job_dir / "media-manifest.json", "media manifest")
         allowed = {"reuse", "transform", "reference_adapt", "recreate", "omit"}
