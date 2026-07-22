@@ -1,4 +1,7 @@
 interface:
-  display_name: "X 搬运到小红书/公众号"
-  short_description: "一条工作流完成 X 抓取、改写、重制图片和双平台排版"
-  default_prompt: "Use $x-to-china-social to run the complete workflow for this X URL, including media archival, attributed rewriting, contextual image recreation, Xiaohongshu output, and validated WeChat layout preview."
+  display_name: "X 转公众号/小红书 V8.2"
+  short_description: "内置浏览器提取、自然中文改写、原创配图、排版与草稿验收"
+  icon_small: "./assets/icon.svg"
+  icon_large: "./assets/icon.svg"
+  brand_color: "#0EA5A4"
+  default_prompt: "Use $x-to-china-social to open this X URL in the Codex in-app browser, extract its article DOM, and create the requested Chinese social output."

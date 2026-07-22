@@ -1,74 +1,26 @@
-# Media archival and adaptation
+# 媒体归档与改编
 
-Treat every source image as an evidence asset, not automatically as reusable publishing material.
+先用 `save_media.py` 保存原文件、URL、哈希、尺寸和 MIME。原文件放 `media/original/`，永不覆盖；派生图放 `media/adapted/`。
 
-## Archive
+逐张目视检查并记录：内容、事实作用、水印、个人信息、权利依据、是否适合移动端。最终决定只能是：
 
-After `source.json` passes verification, run:
+- `reuse`：已获授权或许可明确。
+- `transform`：许可允许变换；不得去水印或淡化署名。
+- `reference_adapt`：原图仅作事实/关系/构图参考，生成视觉上明显原创的新图。
+- `recreate`：完全从文章事实重建解释图。
+- `omit`：权利不清、无必要、含敏感信息或无法安全处理。
 
-```powershell
-python "{baseDir}/scripts/save_media.py" "x-social/<id>/source.json" --output-dir "x-social/<id>"
-```
+建议字段：`rights_review`、`private_information`、`decision_reason`、`reference_use`、`adaptation_constraints`。
 
-This creates immutable files under `media/original/` and `media-manifest.json`. A failed download remains in the manifest with its remote URL and error. Never report it as saved. Do not bypass login, access control, hotlink protection, or a private/deleted post.
+## reference_adapt 流程
 
-Recommended asset tree:
+1. 说明原图承担什么信息功能，而不是描述像素细节。
+2. 记录允许借鉴的关系：对象、顺序、比例、数据、信息层级。
+3. 记录必须改变的表达：版式、配色、图标、字体、装饰、构图细节。
+4. 用文章事实、平台尺寸、品牌语气写 prompt 文件。
+5. 规划：`baoyu-article-illustrator`；封面另用 `baoyu-cover-image`。
+6. 生成：`imagegen`；不得要求复刻在世艺术家风格或移除水印。
+7. 目视 QA：事实一致、原创性、手机可读性。
+8. 用 `baoyu-compress-image` 优化发布版本，保留未压缩派生文件。
 
-```text
-media/
-├── original/       # byte-for-byte downloaded source assets; never edit
-├── adapted/        # crops, resized copies, or newly recreated explanatory visuals
-├── platform/
-│   ├── xhs/        # final Xiaohongshu assets
-│   └── wechat/     # final WeChat assets
-└── prompts/        # reproducible prompts for generated/recreated images
-```
-
-Also create `media/redraw-brief.md` whenever any asset is marked `recreate`. It is the handoff contract between editorial rewriting and image generation.
-
-## Inspect and classify
-
-Visually inspect every saved asset and update its manifest entry before drafting:
-
-- `evidence`: screenshot, photo, quotation card, or result that supports a claim.
-- `chart`: chart, table, diagram, timeline, or workflow.
-- `ui`: product or interface screenshot.
-- `decorative`: cover, illustration, meme, or atmosphere image.
-- `identity`: portrait, logo, trademark, branded character, or protected visual identity.
-
-Record `rights_review`, visible watermark status, relevant private information, factual role, and one decision: `reuse`, `transform`, `recreate`, or `omit`.
-
-## Decision rules
-
-- `reuse`: only when permission/licence is clear or quotation is justified; keep attribution and do not imply the publisher created it.
-- `transform`: crop, resize, compress, or convert format only. Never remove or cover a watermark, signature, logo, credit, or copyright notice.
-- `recreate`: preferred when the source image communicates a useful idea but reuse rights are unclear. Build a genuinely new explanatory visual from verified text/data; do not closely copy composition, style, characters, or branding.
-- `omit`: choose this when the image is irrelevant, sensitive, misleading, inaccessible, or cannot be used responsibly.
-
-Evidence screenshots and charts must not be decoratively altered in ways that change meaning. UI screenshots must retain product identity and have private data redacted when necessary. For charts, verify labels and numbers against `source.md` or a separately cited data source before reconstruction.
-
-## Generate and adapt
-
-For every `recreate` decision, build `media/redraw-brief.md` from all of the following context:
-
-- `source.md`: verified facts, terminology, numbers, and the original image's factual role.
-- `media-manifest.json` plus visual inspection: what the source image communicates, what must be preserved, and what must not be copied.
-- `content-analysis.md`: audience value, information hierarchy, and recommended content form.
-- `voice-brief.md` and the accepted platform draft: the user's editorial perspective, tone, and call to action.
-- platform constraints: Xiaohongshu card sequence/aspect ratio or WeChat article placement/theme.
-
-The brief must state the image objective, verified data, prohibited invention, desired type, placement, aspect ratio, on-image language, accessibility description, attribution, and originality boundary.
-
-Use `$baoyu-article-illustrator` with this brief to decide placement, type, density, style, and palette for new explanatory images. Respect its confirmation gate, save every prompt under `media/prompts/`, then use `$imagegen` for image creation or editing. Preserve unsuccessful candidates and regenerate to fix text; never paint over text programmatically. Use `$baoyu-compress-image` only for non-semantic size/format optimization.
-
-Unless the user owns the image or supplies explicit permission, default to text-derived recreation instead of editing the source bitmap. The new image may express the same verified facts, but it must not pose as the original author's work.
-
-Recreation is contextual, not cosmetic: preserve the idea or verified information that helps the adapted article, but create a new hierarchy, composition, palette, and editorial framing suitable for the chosen platform. Do not mimic a living artist's style or reproduce distinctive copyrighted characters, logos, or layouts.
-
-## Platform mapping
-
-- Xiaohongshu: pass accepted copy and eligible local assets to `$baoyu-xhs-images`. Put final cards in `media/platform/xhs/`; source images may be references only when rights allow.
-- WeChat: map intended local images into `wechat.md` before invoking `$gzh-design`. Put final variants in `media/platform/wechat/` and verify that every intended image survives HTML conversion.
-- Update `media-manifest.json` so every derivative records `path`, `kind`, `platform`, `source_asset`, `adaptation_notes`, and `attribution`.
-
-The published source note must cover both the text and any reused source media. Newly generated visuals should be labelled as editorial illustrations when that distinction matters.
+若原图是数据图，数字和单位必须逐项核对；若是截图，只提炼文章所需事实，不仿制界面或账号身份。
