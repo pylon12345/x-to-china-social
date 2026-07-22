@@ -1,7 +1,7 @@
 interface:
   display_name: "X 转公众号/小红书 V8.2"
-  short_description: "自然中文改写、原创配图、提示词归档与草稿验收"
+  short_description: "内置浏览器提取、自然中文改写、原创配图、排版与草稿验收"
   icon_small: "./assets/icon.svg"
   icon_large: "./assets/icon.svg"
   brand_color: "#0EA5A4"
-  default_prompt: "Use $x-to-china-social to turn this X URL into the requested Chinese social output, archive every image prompt to Obsidian, and save a verified WeChat draft only when I explicitly ask."
+  default_prompt: "Use $x-to-china-social to open this X URL in the Codex in-app browser, extract its article DOM, and create the requested Chinese social output."

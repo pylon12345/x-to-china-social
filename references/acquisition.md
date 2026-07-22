@@ -2,13 +2,14 @@
 
 ## Fast path and budgets
 
-1. Run the source cache probe before any network or browser tool. A valid hit ends acquisition.
-2. On a miss, use one extractor call without media download and import its Markdown with `build_source.py`.
-3. Stop as soon as the URL, author, non-empty body, thread order, and media count pass verification.
-4. If the extractor fails, use one browser method. Prefer the in-app browser for public content; use logged-in Chrome only when the public view is insufficient.
-5. After two machine attempts, request pasted text or screenshots instead of continuing retries.
+1. Run the source cache probe before any browser tool. A valid hit ends acquisition.
+2. On a miss, use the Codex in-app browser once. Claim an already-open exact URL when possible; otherwise open the status permalink.
+3. Read semantic article DOM and write structured JSON with `scripts/browser_source.mjs`; import it with `build_source.py`.
+4. Stop as soon as the URL, author, non-empty body, thread order, and media count pass verification.
+5. Use one viewport screenshot only when page state or visual content needs diagnosis. Do not OCR a long article by default.
+6. If the browser cannot expose complete content, request login in the in-app browser or user-provided text/screenshots. Do not silently switch to another browser or API.
 
-Acquisition budget per URL: at most one extractor call, one browser fallback, no engagement-metric lookup, no media download, and no unrelated-reply expansion. Do not load extractor Markdown into the model merely to reshape it; the importer is deterministic.
+Acquisition budget per URL: one in-app-browser DOM attempt, at most one diagnostic screenshot, no engagement-metric lookup, no media download, and no unrelated-reply expansion. A reverse-engineered extractor is an explicit-consent fallback only, never the default path.
 
 ## Fields to capture
 
@@ -24,13 +25,15 @@ Engagement metrics are omitted by default because they are volatile and add requ
 
 ## Browser extraction
 
-Open the status permalink, not the home feed. Identify the primary post by matching the status ID in the current URL or permalink. Read semantic article regions and visible text; exclude navigation, recommendations, promoted posts, and unrelated replies.
+Open the status permalink, not the home feed. Follow [browser-acquisition.md](browser-acquisition.md). Identify the primary post by matching the status ID in the current URL or permalink. Read semantic `main article` regions and visible text; exclude navigation, recommendations, promoted posts, unrelated replies, and engagement metrics.
+
+For X Articles, start at the article `h1` and preserve heading, paragraph, and list order. For ordinary posts, read `tweetText`. Extract only content media, filtering avatars and recommendation cards. Return summary counts to the model while writing the full structured result directly to disk.
 
 For a thread, include consecutive replies authored by the same handle when they form an obvious numbered or contiguous chain. Stop at the first unrelated branch unless the original author resumes with an explicit continuation. Preserve post boundaries.
 
-If the page shows a login wall, consent overlay, rate-limit message, or an empty shell, switch methods. A screenshot can establish visible wording but not hidden text or media URLs.
+If the page shows a login wall, consent overlay, rate-limit message, or an empty shell, take one viewport screenshot for diagnosis when useful, then ask the user to sign in or provide content. A screenshot can establish visible wording but not hidden text or media URLs.
 
-Do not open a browser to re-verify a successful extractor result unless a required field is missing or internally inconsistent. Do not download the same media during acquisition and again during the media stage.
+Do not reopen or reread the browser after `build_source.py` succeeds. Do not download the same media during acquisition and again during the media stage.
 
 ## Verification gate
 
@@ -49,9 +52,10 @@ After verification, downstream agents read `source-index.json` first. Read `sour
 
 | Symptom | Next action |
 |---|---|
-| Anonymous request gets 401/403/429 | Switch to browser/Chrome |
-| Extractor returns empty body | Open permalink in browser |
-| Replies hidden | Use logged-in Chrome or manual handoff |
+| Page has no primary `main article` | Verify permalink and page load; save one diagnostic screenshot |
+| Login wall or empty shell | Ask the user to sign in in the Codex in-app browser |
+| Replies hidden | Ask the user to expand them or provide the missing text |
 | Deleted/private/age-gated content | Stop; request user-provided content |
-| Video cannot download | Keep the source permalink and summarize only visible context |
+| DOM contains only a visual chart | Save one screenshot for visual inspection; do not invent hidden labels |
+| Reverse API requested as fallback | Obtain consent, call it once, and stop after successful import |
 
